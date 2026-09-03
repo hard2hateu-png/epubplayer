@@ -403,7 +403,7 @@ export function NowPlayingPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex-shrink-0 pb-6" />
+              <div className="flex-shrink-0" />
             </div>
 
             {/* Desktop lyrics mode: Full-screen lyrics with bottom control bar */}
