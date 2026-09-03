@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Trans } from '@lingui/react/macro'
 import { MiniPlayer } from '@/features/player/MiniPlayer'
 import { AppNav } from '@/ui/components/AppNav'
@@ -15,6 +15,7 @@ const log = createLogger('app')
 
 export function AppShell() {
   const location = useLocation()
+  const navigate = useNavigate()
   const currentBook = usePlayerStore((s) => s.currentBook)
   const setCurrentBook = usePlayerStore((s) => s.setCurrentBook)
   const [ttsPreloadStatus, setTtsPreloadStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -159,6 +160,11 @@ export function AppShell() {
   // Now Playing page needs full-bleed layout
   const isFullBleed = location.pathname === '/app/playing'
 
+  // Give Now Playing two deterministic exits so users do not need to walk
+  // backward through browser history. This is navigation-only and sits outside
+  // the reader/player component itself.
+  const showPlayerQuickNav = currentBook && location.pathname === '/app/playing'
+
   // Show bottom nav on Library and Browse pages
   const showNav = location.pathname === '/app' || location.pathname === '/app/browse'
 
@@ -178,6 +184,24 @@ export function AppShell() {
           <Outlet />
         </div>
       </main>
+
+      {/* One-tap navigation from Now Playing (mobile only) */}
+      {showPlayerQuickNav && currentBook && (
+        <nav className="flex flex-shrink-0 gap-2 border-t border-border-muted bg-surface-1 px-4 py-2 pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Player navigation">
+          <button
+            onClick={() => navigate('/app')}
+            className="pressable flex-1 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+          >
+            <Trans>Library</Trans>
+          </button>
+          <button
+            onClick={() => navigate(`/app/book/${currentBook.id}`)}
+            className="pressable flex-1 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
+          >
+            <Trans>Book</Trans>
+          </button>
+        </nav>
+      )}
 
       {/* Mini player (shows when a book is active and not on Now Playing page) */}
       {showMiniPlayer && <MiniPlayer />}
