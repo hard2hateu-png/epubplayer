@@ -59,8 +59,11 @@ export async function parseEPUBToContent(
       title: s.title,
       textContent: s.textContent,
       confidence: 'high' as const,
+      href: s.href,
+      pageMarkers: s.pageMarkers,
     })),
     originalBlob: file,
     contentHash,
+    pageMapVersion: book.pageMapVersion,
   }
 }

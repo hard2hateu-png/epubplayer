@@ -24,6 +24,8 @@ export interface ParsedContent {
   sections: DetectedSection[]
   originalBlob?: Blob
   contentHash: string
+  /** Page-map detector version when the source parser already scanned publisher page data. */
+  pageMapVersion?: number
 }
 
 export interface ContentMetadata {
@@ -52,6 +54,10 @@ export interface DetectedSection {
   title: string
   textContent: string
   confidence: SectionConfidence
+  /** Original EPUB spine href when the source format supplies one. */
+  href?: string
+  /** Publisher-provided page boundaries already mapped to normalized section text. */
+  pageMarkers?: Array<{ label: string; offset: number }>
 }
 
 // ============================================================================
