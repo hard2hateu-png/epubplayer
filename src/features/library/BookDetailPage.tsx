@@ -200,7 +200,7 @@ export function BookDetailPage() {
             {progress > 0 && (
               <div className="mb-4 w-full max-w-xs md:max-w-sm">
                 <div className="mb-1 flex justify-between text-xs text-text-muted">
-                  <span><Trans>{progressLabel}% complete</Trans></span>
+                  <span>{progressLabel}% complete</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
                   <div

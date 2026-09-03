@@ -198,16 +198,17 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
         : 'text-[1.35rem] leading-9'
 
   return (
-    <div className="relative h-full overflow-hidden bg-surface-1/30">
-      {/* Page-like section heading */}
-      <div className="pointer-events-none absolute left-6 right-6 top-5 z-10 text-left text-sm text-text-muted lg:left-10 lg:top-8">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-1/30">
+      {/* Reserved page header: text below scrolls independently and can never
+          pass behind the section title or the reader-view toggle. */}
+      <div className="pointer-events-none flex h-16 flex-shrink-0 items-center px-6 pr-20 text-left text-sm text-text-muted lg:h-20 lg:px-10 lg:pr-24">
         {currentSectionTitle || 'Now Playing'}
       </div>
 
       {/* One TTS chunk = one visual page. There is no continuous chapter scroll. */}
       <div
         ref={containerRef}
-        className="flex h-full items-center justify-center overflow-y-auto overscroll-contain px-7 pb-12 pt-16 lg:px-14 lg:pb-16 lg:pt-20"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain px-7 pb-12 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
       >
         <div className="my-auto w-full max-w-lg text-center lg:max-w-2xl">
           {usesWordBoundaries ? (
