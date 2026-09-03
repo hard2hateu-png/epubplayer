@@ -938,12 +938,9 @@ class PlaybackController {
       return
     }
 
-    // Load section text and create chunks
+    // Load section text and create chunks. This method is also used for background
+    // preloading, so it must not change the visible/current chapter title.
     await chunkManager.loadSection(sectionIndex, section.textContent)
-
-    // Update section title in store and Media Session
-    usePlayerStore.getState().setCurrentSectionTitle(section.title)
-    mediaSessionManager.setChapterTitle(section.title)
   }
 
   private async playCurrentChunk(): Promise<void> {
@@ -1264,6 +1261,17 @@ class PlaybackController {
     // Only log significant state transitions (not position-only changes)
     if (state.status !== prevState.status) {
       // Logged by state machine already
+    }
+
+    // Keep the displayed chapter tied to the ACTUAL playback position. Background
+    // chunk preloading does not change state.sectionIndex, so it can no longer make
+    // the header jump ahead to a different chapter.
+    if (state.sectionIndex !== prevState.sectionIndex) {
+      const section = this.sections[state.sectionIndex]
+      if (section) {
+        usePlayerStore.getState().setCurrentSectionTitle(section.title)
+        mediaSessionManager.setChapterTitle(section.title)
+      }
     }
 
     // Auto-save on position changes

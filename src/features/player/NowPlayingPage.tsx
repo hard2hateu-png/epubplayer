@@ -365,7 +365,7 @@ export function NowPlayingPage() {
                     />
                   </div>
                   <div className="grid grid-cols-3 items-center text-xs text-text-muted" aria-hidden="true">
-                    <span>{chapterCount > 0 ? `Chapter ${chapterNumber} of ${chapterCount}` : t`Loading...`}</span>
+                    <span className="truncate pr-2">{currentSectionTitle || (chapterCount > 0 ? `Section ${chapterNumber} of ${chapterCount}` : t`Loading...`)}</span>
                     {epubPage ? <span className="text-center">Page {epubPage}</span> : <span />}
                     <span className="text-right">{`${bookProgress.toFixed(1)}%`}</span>
                   </div>

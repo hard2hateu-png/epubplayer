@@ -13,8 +13,14 @@
 export function splitTextIntoChunks(text: string, maxChars: number): string[] {
   const limit = Number.isFinite(maxChars) ? Math.max(100, Math.floor(maxChars)) : 500
 
-  // Normalize whitespace
-  const normalized = text.replace(/\s+/g, ' ').trim()
+  // Normalize whitespace. Also repair the specific legacy EPUB-import artifact
+  // where a paragraph boundary was flattened to "sentence.Next". Requiring a
+  // lowercase/digit sentence end followed by Capitalized text avoids touching
+  // normal abbreviations such as U.S.A.
+  const normalized = text
+    .replace(/\s+/g, ' ')
+    .replace(/([a-z0-9][.!?…][”’"')\]]?)(?=[A-Z][a-z])/g, '$1 ')
+    .trim()
   if (!normalized) return []
 
   // Split into sentences

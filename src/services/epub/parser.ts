@@ -158,7 +158,7 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
         continue
       }
 
-      const textContent = extractTextFromDocument(doc)
+      const textContent = normalizeText(extractTextFromDocument(doc))
       const pageMarkers = extractPageMarkers(doc, item.href, pageTargets, item.index ?? i)
       if (!textContent.trim()) {
         continue // Skip empty sections (like cover pages)
@@ -180,7 +180,7 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
         index: sections.length,
         title,
         href: item.href,
-        textContent: normalizeText(textContent),
+        textContent,
         textHash,
         charCount: textContent.length,
         estimatedDuration,
@@ -501,13 +501,31 @@ function buildTocMap(toc: NavItem[]): Map<string, string> {
  * Extract plain text from an HTML document
  */
 function extractTextFromDocument(doc: Document): string {
-  // Remove script and style elements
+  // Remove non-reading content first.
   const scripts = doc.querySelectorAll('script, style, noscript')
   scripts.forEach((el) => el.remove())
 
-  // Get body text
   const body = doc.body || doc.documentElement
-  return body?.textContent || ''
+  if (!body) return ''
+
+  // textContent does not preserve HTML block boundaries. In EPUBs from AO3,
+  // Calibre, and other generators, adjacent paragraphs can therefore become
+  // "sentence.Next" and TTS may literally pronounce the dot. Add harmless
+  // whitespace nodes around common block elements before extracting text.
+  // normalizeText() collapses these to a single space afterward.
+  const blockSelector = [
+    'p', 'div', 'section', 'article', 'header', 'footer', 'blockquote',
+    'li', 'dt', 'dd', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre',
+    'tr', 'td', 'th', 'figure', 'figcaption'
+  ].join(',')
+
+  body.querySelectorAll(blockSelector).forEach((el) => {
+    el.before(doc.createTextNode(' '))
+    el.after(doc.createTextNode(' '))
+  })
+  body.querySelectorAll('br').forEach((el) => el.replaceWith(doc.createTextNode(' ')))
+
+  return body.textContent || ''
 }
 
 /**
