@@ -347,7 +347,7 @@ export function NowPlayingPage() {
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(bookProgress)}
-                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
+                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${bookProgress.toFixed(1)}% of book`}
                     className="relative h-8 w-full cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0"
                     onClick={handleProgressBarClick}
                     onMouseDown={handleDragStart}
@@ -372,7 +372,7 @@ export function NowPlayingPage() {
                   </div>
                   <div className="flex justify-between text-xs text-text-muted" aria-hidden="true">
                     <span>{chapterCount > 0 ? `Chapter ${chapterNumber} of ${chapterCount}` : t`Loading...`}</span>
-                    <span>{`${Math.round(bookProgress)}%`}</span>
+                    <span>{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                 </div>
 
@@ -478,7 +478,7 @@ export function NowPlayingPage() {
                           aria-valuemin={0}
                           aria-valuemax={100}
                           aria-valuenow={Math.round(bookProgress)}
-                          aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
+                          aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${bookProgress.toFixed(1)}% of book`}
                           className="relative h-6 flex-1 cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0"
                           onClick={handleProgressBarClick}
                           onMouseDown={handleDragStart}
@@ -492,7 +492,7 @@ export function NowPlayingPage() {
                           <div className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-md transition-transform hover:scale-125" style={{ left: `${displayProgress}%` }} aria-hidden="true" />
                         </div>
                         <span className="w-16 text-xs text-text-muted" aria-hidden="true">
-                          {`${Math.round(bookProgress)}%`}
+                          {`${bookProgress.toFixed(1)}%`}
                         </span>
                       </div>
                     </div>
@@ -580,7 +580,7 @@ export function NowPlayingPage() {
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(bookProgress)}
-                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
+                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${bookProgress.toFixed(1)}% of book`}
                     className="relative h-8 w-full cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0 lg:h-10"
                     onClick={handleProgressBarClick}
                     onMouseDown={handleDragStart}
@@ -616,7 +616,7 @@ export function NowPlayingPage() {
                         ? `Chapter ${chapterNumber} of ${chapterCount}`
                         : t`Loading...`}
                     </span>
-                    <span>{`${Math.round(bookProgress)}%`}</span>
+                    <span>{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                   
                   {/* Slow mode warning */}
