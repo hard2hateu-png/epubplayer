@@ -49,13 +49,83 @@ export function NowPlayingPage() {
   const [dragProgress, setDragProgress] = useState(0)
   const progressBarRef = useRef<HTMLDivElement>(null)
   
-  // Get sections for chapter list
+  // Get sections for chapter list and whole-book progress.
   const sections = playbackController.getSections()
 
   // Derive chunk info/text directly from the controller.
-  // Avoids duplicated React state (and setState-in-effect lint errors).
+  // Chunk progress is still useful internally, but the visible scrubber is book-wide.
   const chunkInfo = playbackController.getChunkInfo()
   const chunkText = playbackController.getCurrentChunkText()
+
+  // Weight whole-book progress by the amount of text in each section so a short
+  // chapter does not count the same as a long one.
+  const sectionWeights = sections.map((section) => Math.max(1, section.charCount || 0))
+  const totalBookWeight = sectionWeights.reduce((sum, weight) => sum + weight, 0)
+  const weightBeforeCurrentSection = sectionWeights
+    .slice(0, position.sectionIndex)
+    .reduce((sum, weight) => sum + weight, 0)
+  const currentSectionWeight = sectionWeights[position.sectionIndex] ?? 0
+  const currentSectionProgress = Math.max(0, Math.min(1, chunkInfo.progress / 100))
+  const bufferedSectionProgress = Math.max(
+    currentSectionProgress,
+    Math.max(0, Math.min(1, bufferProgress / 100))
+  )
+  const bookProgress = totalBookWeight > 0
+    ? ((weightBeforeCurrentSection + currentSectionWeight * currentSectionProgress) / totalBookWeight) * 100
+    : 0
+  const bookBufferProgress = totalBookWeight > 0
+    ? ((weightBeforeCurrentSection + currentSectionWeight * bufferedSectionProgress) / totalBookWeight) * 100
+    : bookProgress
+  const displayProgress = isDragging ? dragProgress : bookProgress
+  const chapterNumber = sections.length > 0
+    ? Math.min(position.sectionIndex + 1, sections.length)
+    : 0
+  const chapterCount = sections.length
+
+  // Seek to a percentage of the entire book. We first map the percentage to a
+  // section by text length, then map the remainder to a chunk within that section.
+  const seekToBookProgress = useCallback(async (percentage: number) => {
+    const currentSections = playbackController.getSections()
+    if (currentSections.length === 0) return
+
+    const clampedPercentage = Math.max(0, Math.min(100, percentage))
+    const weights = currentSections.map((section) => Math.max(1, section.charCount || 0))
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0)
+    if (totalWeight <= 0) return
+
+    const targetWeight = (clampedPercentage / 100) * totalWeight
+    let accumulatedWeight = 0
+    let targetSectionIndex = currentSections.length - 1
+    let localSectionProgress = 1
+
+    for (let i = 0; i < currentSections.length; i++) {
+      const sectionWeight = weights[i]
+      const sectionEnd = accumulatedWeight + sectionWeight
+
+      if (targetWeight <= sectionEnd || i === currentSections.length - 1) {
+        targetSectionIndex = i
+        localSectionProgress = sectionWeight > 0
+          ? Math.max(0, Math.min(1, (targetWeight - accumulatedWeight) / sectionWeight))
+          : 0
+        break
+      }
+
+      accumulatedWeight = sectionEnd
+    }
+
+    await playbackController.goToSection(targetSectionIndex)
+
+    const targetChunkInfo = playbackController.getChunkInfo()
+    if (targetChunkInfo.total > 0) {
+      const targetChunk = Math.min(
+        targetChunkInfo.total - 1,
+        Math.max(0, Math.floor(localSectionProgress * targetChunkInfo.total))
+      )
+      if (targetChunk > 0) {
+        await playbackController.goToChunk(targetChunk)
+      }
+    }
+  }, [])
 
   // Check if using slow WASM mode
   useEffect(() => {
@@ -71,68 +141,63 @@ export function NowPlayingPage() {
     }
   }, [isBuffering])
 
-  // Handle progress bar interaction
+  // Handle whole-book progress bar interaction
   const handleProgressBarClick = useCallback(async (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || chunkInfo.total <= 0) return
+    if (!progressBarRef.current || sections.length === 0) return
     
     const rect = progressBarRef.current.getBoundingClientRect()
     if (rect.width === 0) return
     
     const clickX = e.clientX - rect.left
-    const percentage = Math.max(0, Math.min(1, clickX / rect.width))
-    const targetChunk = Math.floor(percentage * chunkInfo.total)
-    
-    if (Number.isFinite(targetChunk) && targetChunk >= 0) {
-      await playbackController.goToChunk(targetChunk)
-    }
-  }, [chunkInfo.total])
+    const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100))
+    await seekToBookProgress(percentage)
+  }, [sections.length, seekToBookProgress])
 
   // Handle drag start
   const handleDragStart = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!progressBarRef.current || chunkInfo.total === 0) return
+    if (!progressBarRef.current || sections.length === 0) return
     setIsDragging(true)
     
     const rect = progressBarRef.current.getBoundingClientRect()
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100))
     setDragProgress(percentage)
-  }, [chunkInfo.total])
+  }, [sections.length])
 
-  // Handle keyboard navigation on progress bar
+  // Handle keyboard navigation on the whole-book scrubber
   const { announce } = useAnnounce()
   const handleProgressBarKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (chunkInfo.total <= 0) return
+    if (sections.length === 0) return
     
-    const step = e.shiftKey ? 10 : 1 // Hold Shift for larger jumps
-    let targetChunk = chunkInfo.current - 1 // Convert to 0-indexed
+    const step = e.shiftKey ? 5 : 1
+    let targetProgress = bookProgress
     
     switch (e.key) {
       case 'ArrowRight':
       case 'ArrowUp':
         e.preventDefault()
-        targetChunk = Math.min(chunkInfo.total - 1, targetChunk + step)
+        targetProgress = Math.min(100, targetProgress + step)
         break
       case 'ArrowLeft':
       case 'ArrowDown':
         e.preventDefault()
-        targetChunk = Math.max(0, targetChunk - step)
+        targetProgress = Math.max(0, targetProgress - step)
         break
       case 'Home':
         e.preventDefault()
-        targetChunk = 0
+        targetProgress = 0
         break
       case 'End':
         e.preventDefault()
-        targetChunk = chunkInfo.total - 1
+        targetProgress = 100
         break
       default:
         return
     }
     
-    await playbackController.goToChunk(targetChunk)
-    const newProgress = Math.round((targetChunk / chunkInfo.total) * 100)
-    announce(`${newProgress}% complete, part ${targetChunk + 1} of ${chunkInfo.total}`)
-  }, [chunkInfo.total, chunkInfo.current, announce])
+    await seekToBookProgress(targetProgress)
+    announce(`${Math.round(targetProgress)}% of book complete`)
+  }, [sections.length, bookProgress, seekToBookProgress, announce])
 
   // Handle drag move
   useEffect(() => {
@@ -148,11 +213,8 @@ export function NowPlayingPage() {
 
     const handleEnd = async () => {
       setIsDragging(false)
-      if (chunkInfo.total > 0 && Number.isFinite(dragProgress)) {
-        const targetChunk = Math.floor((dragProgress / 100) * chunkInfo.total)
-        if (Number.isFinite(targetChunk) && targetChunk >= 0) {
-          await playbackController.goToChunk(targetChunk)
-        }
+      if (sections.length > 0 && Number.isFinite(dragProgress)) {
+        await seekToBookProgress(dragProgress)
       }
     }
 
@@ -167,7 +229,7 @@ export function NowPlayingPage() {
       window.removeEventListener('touchmove', handleMove)
       window.removeEventListener('touchend', handleEnd)
     }
-  }, [isDragging, dragProgress, chunkInfo.total])
+  }, [isDragging, dragProgress, sections.length, seekToBookProgress])
 
   const handleSpeedChange = async (newSpeed: number) => {
     await playbackController.setSpeed(newSpeed)
@@ -267,17 +329,17 @@ export function NowPlayingPage() {
 
               {/* Mobile controls (same as before) */}
               <div className="flex flex-shrink-0 flex-col items-center px-6">
-                {/* Progress bar */}
+                {/* Whole-book progress bar */}
                 <div className="w-full max-w-sm flex-shrink-0">
                   <div 
                     ref={progressBarRef}
                     role="slider"
                     tabIndex={0}
-                    aria-label={t`Playback progress`}
+                    aria-label={t`Book progress`}
                     aria-valuemin={0}
-                    aria-valuemax={chunkInfo.total}
-                    aria-valuenow={chunkInfo.current}
-                    aria-valuetext={t`Part ${chunkInfo.current} of ${chunkInfo.total}, ${Math.round(chunkInfo.progress)}% complete`}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(bookProgress)}
+                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
                     className="relative h-8 w-full cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0"
                     onClick={handleProgressBarClick}
                     onMouseDown={handleDragStart}
@@ -287,22 +349,22 @@ export function NowPlayingPage() {
                     <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3">
                       <div
                         className="absolute h-full bg-accent/30 transition-all duration-200"
-                        style={{ width: `${Math.max(bufferProgress, isDragging ? dragProgress : chunkInfo.progress)}%` }}
+                        style={{ width: `${Math.max(bookBufferProgress, displayProgress)}%` }}
                       />
                       <div
                         className="absolute h-full bg-accent transition-all duration-150"
-                        style={{ width: `${isDragging ? dragProgress : chunkInfo.progress}%` }}
+                        style={{ width: `${displayProgress}%` }}
                       />
                     </div>
                     <div 
                       className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-lg transition-transform active:scale-125"
-                      style={{ left: `${isDragging ? dragProgress : chunkInfo.progress}%` }}
+                      style={{ left: `${displayProgress}%` }}
                       aria-hidden="true"
                     />
                   </div>
                   <div className="flex justify-between text-xs text-text-muted" aria-hidden="true">
-                    <span>{chunkInfo.total > 0 ? t`Part ${chunkInfo.current} of ${chunkInfo.total}` : t`Loading...`}</span>
-                    <span>{isBuffering ? t`Generating...` : `${Math.round(chunkInfo.progress)}%`}</span>
+                    <span>{chapterCount > 0 ? `Chapter ${chapterNumber} of ${chapterCount}` : t`Loading...`}</span>
+                    <span>{`${Math.round(bookProgress)}%`}</span>
                   </div>
                 </div>
 
@@ -395,20 +457,20 @@ export function NowPlayingPage() {
                         </button>
                       </div>
                       
-                      {/* Progress bar */}
+                      {/* Whole-book progress bar */}
                       <div className="flex w-full max-w-md items-center gap-3">
                         <span className="w-16 text-right text-xs text-text-muted" aria-hidden="true">
-                          {chunkInfo.total > 0 ? `${chunkInfo.current}/${chunkInfo.total}` : '—'}
+                          {chapterCount > 0 ? `Ch ${chapterNumber}/${chapterCount}` : '—'}
                         </span>
                         <div 
                           ref={progressBarRef}
                           role="slider"
                           tabIndex={0}
-                          aria-label={t`Playback progress`}
+                          aria-label={t`Book progress`}
                           aria-valuemin={0}
-                          aria-valuemax={chunkInfo.total}
-                          aria-valuenow={chunkInfo.current}
-                          aria-valuetext={t`Part ${chunkInfo.current} of ${chunkInfo.total}, ${Math.round(chunkInfo.progress)}% complete`}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round(bookProgress)}
+                          aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
                           className="relative h-6 flex-1 cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0"
                           onClick={handleProgressBarClick}
                           onMouseDown={handleDragStart}
@@ -416,13 +478,13 @@ export function NowPlayingPage() {
                           onKeyDown={handleProgressBarKeyDown}
                         >
                           <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3">
-                            <div className="absolute h-full bg-accent/30 transition-all duration-200" style={{ width: `${Math.max(bufferProgress, isDragging ? dragProgress : chunkInfo.progress)}%` }} />
-                            <div className="absolute h-full bg-accent transition-all duration-150" style={{ width: `${isDragging ? dragProgress : chunkInfo.progress}%` }} />
+                            <div className="absolute h-full bg-accent/30 transition-all duration-200" style={{ width: `${Math.max(bookBufferProgress, displayProgress)}%` }} />
+                            <div className="absolute h-full bg-accent transition-all duration-150" style={{ width: `${displayProgress}%` }} />
                           </div>
-                          <div className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-md transition-transform hover:scale-125" style={{ left: `${isDragging ? dragProgress : chunkInfo.progress}%` }} aria-hidden="true" />
+                          <div className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-md transition-transform hover:scale-125" style={{ left: `${displayProgress}%` }} aria-hidden="true" />
                         </div>
                         <span className="w-16 text-xs text-text-muted" aria-hidden="true">
-                          {isBuffering ? 'Gen...' : `${Math.round(chunkInfo.progress)}%`}
+                          {`${Math.round(bookProgress)}%`}
                         </span>
                       </div>
                     </div>
@@ -495,18 +557,18 @@ export function NowPlayingPage() {
                   </p>
                 )}
 
-                {/* Progress bar */}
+                {/* Whole-book progress bar */}
                 <div className="w-full max-w-sm flex-shrink-0 lg:max-w-full">
                   {/* Interactive progress track */}
                   <div 
                     ref={progressBarRef}
                     role="slider"
                     tabIndex={0}
-                    aria-label={t`Playback progress`}
+                    aria-label={t`Book progress`}
                     aria-valuemin={0}
-                    aria-valuemax={chunkInfo.total}
-                    aria-valuenow={chunkInfo.current}
-                    aria-valuetext={t`Part ${chunkInfo.current} of ${chunkInfo.total}, ${Math.round(chunkInfo.progress)}% complete`}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(bookProgress)}
+                    aria-valuetext={t`Chapter ${chapterNumber} of ${chapterCount}, ${Math.round(bookProgress)}% of book`}
                     className="relative h-8 w-full cursor-pointer touch-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0 lg:h-10"
                     onClick={handleProgressBarClick}
                     onMouseDown={handleDragStart}
@@ -518,48 +580,31 @@ export function NowPlayingPage() {
                       {/* Buffered-ahead fill (lighter) */}
                       <div
                         className="absolute h-full bg-accent/30 transition-all duration-200"
-                        style={{ width: `${Math.max(bufferProgress, isDragging ? dragProgress : chunkInfo.progress)}%` }}
+                        style={{ width: `${Math.max(bookBufferProgress, displayProgress)}%` }}
                       />
-                      {/* Progress fill */}
+                      {/* Whole-book progress fill */}
                       <div
                         className="absolute h-full bg-accent transition-all duration-150"
-                        style={{ width: `${isDragging ? dragProgress : chunkInfo.progress}%` }}
+                        style={{ width: `${displayProgress}%` }}
                       />
                     </div>
                     
                     {/* Draggable thumb */}
                     <div 
                       className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-lg transition-transform active:scale-125 lg:h-5 lg:w-5"
-                      style={{ left: `${isDragging ? dragProgress : chunkInfo.progress}%` }}
+                      style={{ left: `${displayProgress}%` }}
                       aria-hidden="true"
                     />
-                    
-                    {/* Chunk markers (subtle dots) */}
-                    {chunkInfo.total > 1 && chunkInfo.total <= 20 && (
-                      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2" aria-hidden="true">
-                        {Array.from({ length: chunkInfo.total }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="absolute h-1 w-1 -translate-x-1/2 rounded-full bg-text-muted/30"
-                            style={{ left: `${(i / chunkInfo.total) * 100}%` }}
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
                   
                   {/* Progress info */}
                   <div className="flex justify-between text-xs text-text-muted lg:text-sm">
                     <span>
-                      {chunkInfo.total > 0 
-                        ? t`Part ${chunkInfo.current} of ${chunkInfo.total}`
+                      {chapterCount > 0 
+                        ? `Chapter ${chapterNumber} of ${chapterCount}`
                         : t`Loading...`}
                     </span>
-                    <span>
-                      {isBuffering 
-                        ? t`Generating...` 
-                        : `${Math.round(chunkInfo.progress)}%`}
-                    </span>
+                    <span>{`${Math.round(bookProgress)}%`}</span>
                   </div>
                   
                   {/* Slow mode warning */}
