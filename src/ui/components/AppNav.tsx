@@ -20,8 +20,9 @@ const navItems = [
 export function AppNav() {
   return (
     <>
-      {/* Mobile bottom tabs */}
-      <nav className="flex border-t border-border-muted bg-surface-1 pb-[env(safe-area-inset-bottom)] md:hidden">
+      {/* Mobile bottom tabs. The app shell/body already reserves the iPhone
+          safe area, so this bar should not add the same inset a second time. */}
+      <nav className="flex border-t border-border-muted bg-surface-1 md:hidden">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
