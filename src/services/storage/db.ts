@@ -16,8 +16,17 @@ export interface Book {
   publisher?: string
   description?: string
   totalSections: number
+  /** True once the original EPUB has been checked for publisher-provided page markers. */
+  pageMapChecked?: boolean
   addedAt: Date
   lastPlayedAt?: Date
+}
+
+export interface PageMarker {
+  /** Publisher-provided page label, e.g. "87" or "xii". */
+  label: string
+  /** Character offset in the normalized TTS section text where this page begins. */
+  offset: number
 }
 
 export interface Section {
@@ -30,6 +39,8 @@ export interface Section {
   textHash: string // Hash of textContent for cache key
   charCount: number
   estimatedDuration: number // Estimated TTS duration in seconds
+  /** Original EPUB/print page boundaries when the EPUB actually supplies them. */
+  pageMarkers?: PageMarker[]
 }
 
 export interface PlaybackState {

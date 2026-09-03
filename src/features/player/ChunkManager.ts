@@ -19,6 +19,8 @@ export interface ChunkInfo {
   chunkIndex: number
   text: string
   textHash: string
+  /** Start offset of this unchanged chunk inside the normalized section text. */
+  startOffset: number
 }
 
 export interface ChunkPosition {
@@ -69,6 +71,16 @@ export class ChunkManager {
     const maxChunkChars = await settingsRepository.get('maxChunkChars')
     const textChunks = splitTextIntoChunks(text, maxChunkChars)
 
+    // Record where each unchanged chunk begins in the normalized section text.
+    // This is UI metadata only; the text passed to TTS is byte-for-byte the same.
+    let searchFrom = 0
+    const chunkStarts = textChunks.map((chunkText) => {
+      const found = text.indexOf(chunkText, searchFrom)
+      const startOffset = found >= 0 ? found : searchFrom
+      searchFrom = startOffset + chunkText.length
+      return startOffset
+    })
+
     // Create chunk info objects
     const newChunks: ChunkInfo[] = await Promise.all(
       textChunks.map(async (chunkText, index) => ({
@@ -76,6 +88,7 @@ export class ChunkManager {
         chunkIndex: index,
         text: chunkText,
         textHash: await hashText(chunkText),
+        startOffset: chunkStarts[index] ?? 0,
       }))
     )
 
