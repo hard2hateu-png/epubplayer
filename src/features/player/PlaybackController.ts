@@ -23,6 +23,7 @@ import {
 import type { Section } from '@/services/storage'
 import { ttsManager, type TTSEngine } from '@/services/tts'
 import { settingsRepository } from '@/services/storage/settingsRepository'
+import { enrichSectionsWithPageMarkers } from '@/services/epub/parser'
 import { ttsBufferManager } from './TTSBufferManager'
 import { mediaSessionManager } from './MediaSessionManager'
 import { audioSessionService } from '@/services/audio/audioSessionService'
@@ -165,6 +166,22 @@ class PlaybackController {
 
       // Load sections from DB
       this.sections = await sectionRepository.getForBook(book.id)
+
+      // Books imported before page tracking existed can be checked once using the
+      // original stored EPUB. If the EPUB contains no page map/pagebreaks, nothing
+      // is displayed and we remember that we already checked.
+      const storedBook = await bookRepository.get(book.id)
+      if (storedBook?.pageMapChecked !== true && storedBook?.epubBlob) {
+        try {
+          this.sections = await enrichSectionsWithPageMarkers(storedBook.epubBlob, this.sections)
+          await sectionRepository.replaceForBook(book.id, this.sections)
+          await bookRepository.update(book.id, { pageMapChecked: true })
+        } catch (error) {
+          log.warn('Could not read EPUB page map', error)
+        } finally {
+          if (storedBook.coverUrl) URL.revokeObjectURL(storedBook.coverUrl)
+        }
+      }
 
       // Load saved playback state
       const savedState = await playbackRepository.get(book.id)
@@ -763,6 +780,42 @@ class PlaybackController {
       sectionIndex: state.sectionIndex,
       chunkIndex: state.chunkIndex,
     })
+  }
+
+  /**
+   * Return the publisher-provided EPUB/print page at the current audio position.
+   * Returns null when the original EPUB does not contain page information.
+   */
+  getCurrentEpubPage(): string | null {
+    const state = playbackStateMachine.getState()
+    const chunk = chunkManager.getChunk({
+      sectionIndex: state.sectionIndex,
+      chunkIndex: state.chunkIndex,
+    })
+    if (!chunk) return null
+
+    const store = usePlayerStore.getState()
+    const liveFraction = store.chunkDuration > 0
+      ? Math.max(0, Math.min(1, store.position.timeInChunk / store.chunkDuration))
+      : 0
+    const textOffset = chunk.startOffset + Math.floor(chunk.text.length * liveFraction)
+
+    const currentMarkers = this.sections[state.sectionIndex]?.pageMarkers || []
+    let currentLabel: string | null = null
+    for (const marker of currentMarkers) {
+      if (marker.offset <= textOffset) currentLabel = marker.label
+      else break
+    }
+    if (currentLabel) return currentLabel
+
+    // At the very beginning of a section, the physical page may have started in
+    // the previous section. Carry the most recent real marker forward.
+    for (let sectionIndex = state.sectionIndex - 1; sectionIndex >= 0; sectionIndex--) {
+      const markers = this.sections[sectionIndex]?.pageMarkers || []
+      if (markers.length > 0) return markers[markers.length - 1].label
+    }
+
+    return null
   }
 
   /**

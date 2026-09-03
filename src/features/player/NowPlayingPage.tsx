@@ -57,6 +57,7 @@ export function NowPlayingPage() {
   // Chunk progress is still useful internally, but the visible scrubber is book-wide.
   const chunkInfo = playbackController.getChunkInfo()
   const chunkText = playbackController.getCurrentChunkText()
+  const epubPage = playbackController.getCurrentEpubPage()
 
   // Weight whole-book progress by the amount of text in each section so a short
   // chapter does not count the same as a long one.
@@ -363,9 +364,10 @@ export function NowPlayingPage() {
                       aria-hidden="true"
                     />
                   </div>
-                  <div className="flex justify-between text-xs text-text-muted" aria-hidden="true">
+                  <div className="grid grid-cols-3 items-center text-xs text-text-muted" aria-hidden="true">
                     <span>{chapterCount > 0 ? `Chapter ${chapterNumber} of ${chapterCount}` : t`Loading...`}</span>
-                    <span>{`${bookProgress.toFixed(1)}%`}</span>
+                    {epubPage ? <span className="text-center">Page {epubPage}</span> : <span />}
+                    <span className="text-right">{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                 </div>
 
@@ -591,13 +593,14 @@ export function NowPlayingPage() {
                   </div>
                   
                   {/* Progress info */}
-                  <div className="flex justify-between text-xs text-text-muted lg:text-sm">
+                  <div className="grid grid-cols-3 items-center text-xs text-text-muted lg:text-sm">
                     <span>
                       {chapterCount > 0 
                         ? `Chapter ${chapterNumber} of ${chapterCount}`
                         : t`Loading...`}
                     </span>
-                    <span>{`${bookProgress.toFixed(1)}%`}</span>
+                    {epubPage ? <span className="text-center">Page {epubPage}</span> : <span />}
+                    <span className="text-right">{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                   
                   {/* Slow mode warning */}

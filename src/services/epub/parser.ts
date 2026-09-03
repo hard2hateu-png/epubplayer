@@ -1,7 +1,7 @@
 import ePub, { type Book as EPubBook, type NavItem } from 'epubjs'
 import { createLogger } from '@/services/logging'
 import { hashText, sectionId } from '@/services/storage/db'
-import type { Book, Section } from '@/services/storage/db'
+import type { Book, Section, PageMarker } from '@/services/storage/db'
 
 const log = createLogger('epub')
 
@@ -58,6 +58,7 @@ export async function parseEPUB(file: File): Promise<ParsedEPUB> {
     publisher: metadata.publisher,
     description: metadata.description,
     totalSections: sections.length,
+    pageMapChecked: true,
   }
 
   // Clean up
@@ -116,6 +117,7 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
   // Get navigation (TOC) for section titles
   const navigation = epub.navigation
   const tocMap = buildTocMap(navigation?.toc || [])
+  const pageTargets = getPageTargets(epub)
 
   // Access spine items
   const spineItems = (spine as unknown as { items: Array<{ href: string; index: number }> }).items
@@ -153,6 +155,7 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
       }
 
       const textContent = extractTextFromDocument(doc)
+      const pageMarkers = extractPageMarkers(doc, item.href, pageTargets)
       if (!textContent.trim()) {
         continue // Skip empty sections (like cover pages)
       }
@@ -177,6 +180,7 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
         textHash,
         charCount: textContent.length,
         estimatedDuration,
+        pageMarkers: pageMarkers.length > 0 ? pageMarkers : undefined,
       })
 
       log.debug('Added section', { title, chars: textContent.length })
@@ -186,6 +190,177 @@ async function extractSections(epub: EPubBook, bookId: string): Promise<Section[
   }
 
   return sections
+}
+
+
+interface PageTarget {
+  path: string
+  fragment: string
+  label: string
+}
+
+function normalizeBookPath(path: string): string {
+  try {
+    return decodeURIComponent(path.split('?')[0])
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+  } catch {
+    return path.split('?')[0].replace(/^\/+/, '').replace(/^\.\//, '')
+  }
+}
+
+function resolvePageHref(navPath: string, href: string): { path: string; fragment: string } | null {
+  if (!href || href.includes('epubcfi(')) return null
+
+  const hashIndex = href.indexOf('#')
+  const rawPath = hashIndex >= 0 ? href.slice(0, hashIndex) : href
+  const rawFragment = hashIndex >= 0 ? href.slice(hashIndex + 1) : ''
+  if (!rawFragment) return null
+
+  try {
+    const base = new URL(navPath || 'nav.xhtml', 'https://epub.local/')
+    const resolved = new URL(rawPath || base.pathname, base)
+    return {
+      path: normalizeBookPath(resolved.pathname),
+      fragment: decodeURIComponent(rawFragment),
+    }
+  } catch {
+    return {
+      path: normalizeBookPath(rawPath),
+      fragment: rawFragment,
+    }
+  }
+}
+
+function getPageTargets(epub: EPubBook): PageTarget[] {
+  const rawBook = epub as unknown as {
+    pageList?: { pageList?: Array<{ href?: string; page?: string | number }> }
+    packaging?: { navPath?: string; ncxPath?: string }
+  }
+  const items = rawBook.pageList?.pageList || []
+  const navPath = rawBook.packaging?.navPath || rawBook.packaging?.ncxPath || 'nav.xhtml'
+  const targets: PageTarget[] = []
+
+  for (const item of items) {
+    const label = item.page == null ? '' : String(item.page).trim()
+    if (!item.href || !label || label === 'NaN') continue
+    const resolved = resolvePageHref(navPath, item.href)
+    if (!resolved) continue
+    targets.push({ ...resolved, label })
+  }
+
+  return targets
+}
+
+function normalizedOffsetBefore(doc: Document, node: Element): number {
+  try {
+    const root = doc.body || doc.documentElement
+    const range = doc.createRange()
+    range.selectNodeContents(root)
+    range.setEndBefore(node)
+    return normalizeText(range.toString()).length
+  } catch {
+    return 0
+  }
+}
+
+function pageBreakLabel(element: Element): string | null {
+  const candidates = [
+    element.getAttribute('aria-label'),
+    element.getAttribute('title'),
+    element.textContent,
+    element.getAttribute('id'),
+  ]
+
+  for (const raw of candidates) {
+    const value = raw?.trim()
+    if (!value) continue
+    const match = value.match(/(?:page[\s_-]*)?([0-9]+|[ivxlcdm]+)/i)
+    if (match?.[1]) return match[1]
+  }
+
+  return null
+}
+
+function extractPageMarkers(doc: Document, sectionHref: string, pageTargets: PageTarget[]): PageMarker[] {
+  const markers: PageMarker[] = []
+  const sectionPath = normalizeBookPath(sectionHref.split('#')[0])
+
+  // Explicit EPUB navigation page-list: map its anchor to an offset in the exact
+  // normalized section text that is later handed to the TTS chunker.
+  for (const target of pageTargets) {
+    if (target.path !== sectionPath) continue
+    const node = doc.getElementById(target.fragment)
+    if (!node) continue
+    markers.push({ label: target.label, offset: normalizedOffsetBefore(doc, node) })
+  }
+
+  // Some EPUBs omit a nav page-list but embed semantic pagebreak markers in the
+  // content documents. Those are also publisher-provided page data, not guessed pages.
+  for (const element of Array.from(doc.getElementsByTagName('*'))) {
+    const epubType =
+      element.getAttribute('epub:type') ||
+      element.getAttributeNS('http://www.idpf.org/2007/ops', 'type') ||
+      ''
+    const role = element.getAttribute('role') || ''
+    const isPageBreak = epubType.split(/\s+/).includes('pagebreak') || role === 'doc-pagebreak'
+    if (!isPageBreak) continue
+
+    const label = pageBreakLabel(element)
+    if (!label) continue
+    markers.push({ label, offset: normalizedOffsetBefore(doc, element) })
+  }
+
+  const deduped = new Map<string, PageMarker>()
+  for (const marker of markers) {
+    deduped.set(`${marker.offset}:${marker.label}`, marker)
+  }
+
+  return Array.from(deduped.values()).sort((a, b) => a.offset - b.offset)
+}
+
+/**
+ * One-time page-map backfill for books imported before page tracking existed.
+ * Uses the original stored EPUB and never changes TTS text or chunking.
+ */
+export async function enrichSectionsWithPageMarkers(
+  epubBlob: Blob,
+  sections: Section[]
+): Promise<Section[]> {
+  const epub = ePub(await epubBlob.arrayBuffer())
+  await epub.ready
+  const pageTargets = getPageTargets(epub)
+  const updated: Section[] = sections.map((section) => ({ ...section, pageMarkers: undefined }))
+  const byHref = new Map(updated.map((section, index) => [normalizeBookPath(section.href.split('#')[0]), index]))
+
+  const spineItems = (epub.spine as unknown as { items: Array<{ href: string }> }).items || []
+
+  try {
+    for (let i = 0; i < spineItems.length; i++) {
+      const item = spineItems[i]
+      const sectionIndex = byHref.get(normalizeBookPath(item.href.split('#')[0]))
+      if (sectionIndex == null) continue
+
+      const spineSection = epub.spine.get(item.href) || epub.spine.get(i)
+      if (!spineSection) continue
+      const sectionObj = spineSection as unknown as {
+        load: (loader: (url: string) => Promise<unknown>) => Promise<unknown>
+        document?: Document
+      }
+      await sectionObj.load(epub.load.bind(epub))
+      if (!sectionObj.document) continue
+
+      const markers = extractPageMarkers(sectionObj.document, item.href, pageTargets)
+      updated[sectionIndex] = {
+        ...updated[sectionIndex],
+        pageMarkers: markers.length > 0 ? markers : undefined,
+      }
+    }
+  } finally {
+    epub.destroy()
+  }
+
+  return updated
 }
 
 /**
