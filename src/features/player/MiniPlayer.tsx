@@ -3,6 +3,7 @@ import { t } from '@lingui/core/macro'
 import { usePlayerStore } from './playerStore'
 import { playbackController } from './PlaybackController'
 import { PlayIcon, PauseIcon } from '@/ui/icons'
+import { BookCover } from '@/ui/components/BookCover'
 
 export function MiniPlayer() {
   const navigate = useNavigate()
@@ -44,17 +45,11 @@ export function MiniPlayer() {
         <div className="flex items-center gap-3 px-4 py-3 md:gap-4 md:px-6">
           {/* Cover art */}
           <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-surface-3 md:h-14 md:w-14">
-            {currentBook.coverUrl ? (
-              <img
-                src={currentBook.coverUrl}
-                alt={currentBook.title}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-text-muted">
-                <span className="text-xl">📖</span>
-              </div>
-            )}
+            <BookCover
+              bookId={currentBook.id}
+              title={currentBook.title}
+              coverUrl={currentBook.coverUrl}
+            />
           </div>
 
           {/* Title and info */}

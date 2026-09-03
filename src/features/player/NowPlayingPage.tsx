@@ -9,6 +9,7 @@ import { SleepTimerSheet } from '@/ui/components/SleepTimerSheet'
 import { BookmarkSheet } from '@/ui/components/BookmarkSheet'
 import { SpeedSheet } from '@/ui/components/SpeedSheet'
 import { LyricsView } from './LyricsView'
+import { BookCover } from '@/ui/components/BookCover'
 import { ttsManager } from '@/services/tts'
 import { useAnnounce } from '@/ui/accessibility'
 import {
@@ -47,15 +48,7 @@ export function NowPlayingPage() {
   const [isSlowMode, setIsSlowMode] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState(0)
-  const [coverLoaded, setCoverLoaded] = useState(false)
   const progressBarRef = useRef<HTMLDivElement>(null)
-
-  // A cover blob URL can briefly be unavailable while the app refreshes it
-  // from IndexedDB after a reload. Keep the neutral placeholder visible until
-  // the refreshed image has actually loaded instead of flashing a broken icon.
-  useEffect(() => {
-    setCoverLoaded(false)
-  }, [currentBook?.coverUrl])
   
   // Get sections for chapter list and whole-book progress.
   const sections = playbackController.getSections()
@@ -427,13 +420,11 @@ export function NowPlayingPage() {
                     {/* Mini cover art + info */}
                     <div className="flex items-center gap-4">
                       <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-surface-3 shadow-lg">
-                        {currentBook.coverUrl ? (
-                          <img src={currentBook.coverUrl} alt={currentBook.title} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/20 to-purple-900/30">
-                            <span className="text-2xl opacity-50">📖</span>
-                          </div>
-                        )}
+                        <BookCover
+                          bookId={currentBook.id}
+                          title={currentBook.title}
+                          coverUrl={currentBook.coverUrl}
+                        />
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-text-primary">{currentBook.title}</p>
@@ -526,21 +517,11 @@ export function NowPlayingPage() {
                 {/* Book cover */}
                 <div className="flex min-h-0 h-full w-full max-w-xs flex-shrink items-center justify-center pb-3 lg:h-auto lg:max-w-md lg:pb-0">
                   <div className="relative aspect-square h-[min(32vh,16rem)] w-auto max-h-full max-w-full overflow-hidden rounded-2xl bg-surface-3 shadow-2xl shadow-black/50 lg:h-auto lg:w-full lg:rounded-3xl">
-                    <div
-                      className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-accent/20 to-purple-900/30"
-                      aria-hidden="true"
-                    >
-                      <span className="text-6xl opacity-50 lg:text-8xl">📖</span>
-                    </div>
-                    {currentBook.coverUrl && (
-                      <img
-                        src={currentBook.coverUrl}
-                        alt={currentBook.title}
-                        onLoad={() => setCoverLoaded(true)}
-                        onError={() => setCoverLoaded(false)}
-                        className={`relative h-full w-full object-cover transition-opacity duration-150 ${coverLoaded ? 'opacity-100' : 'opacity-0'}`}
-                      />
-                    )}
+                    <BookCover
+                      bookId={currentBook.id}
+                      title={currentBook.title}
+                      coverUrl={currentBook.coverUrl}
+                    />
                   </div>
                 </div>
 
