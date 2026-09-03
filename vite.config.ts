@@ -16,7 +16,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'og-image.png'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon-v2.png', 'app-icon-192.png', 'app-icon-512.png', 'og-image.png'],
       manifest: {
         name: 'EPUB Player',
         short_name: 'EPUBPlayer',
@@ -33,17 +33,17 @@ export default defineConfig({
         dir: 'ltr',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'app-icon-192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'app-icon-512.png',
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'app-icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -54,7 +54,7 @@ export default defineConfig({
             name: 'Open Library',
             short_name: 'Library',
             url: '/app',
-            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }],
+            icons: [{ src: 'app-icon-192.png', sizes: '192x192' }],
           },
         ],
         screenshots: [

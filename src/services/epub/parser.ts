@@ -5,6 +5,9 @@ import type { Book, Section, PageMarker } from '@/services/storage/db'
 
 const log = createLogger('epub')
 
+// Bump when page-marker detection changes so existing imported EPUBs are rescanned once.
+export const EPUB_PAGE_MAP_VERSION = 2
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -59,6 +62,7 @@ export async function parseEPUB(file: File): Promise<ParsedEPUB> {
     description: metadata.description,
     totalSections: sections.length,
     pageMapChecked: true,
+    pageMapVersion: EPUB_PAGE_MAP_VERSION,
   }
 
   // Clean up
@@ -268,6 +272,9 @@ function pageBreakLabel(element: Element): string | null {
   const candidates = [
     element.getAttribute('aria-label'),
     element.getAttribute('title'),
+    element.getAttribute('data-page'),
+    element.getAttribute('data-page-number'),
+    element.getAttribute('value'),
     element.textContent,
     element.getAttribute('id'),
   ]

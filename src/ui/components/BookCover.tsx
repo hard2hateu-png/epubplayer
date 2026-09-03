@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-const PREVIEW_PREFIX = 'epub-cover-preview:'
+const PREVIEW_PREFIX = 'epub-cover-preview-v2:'
 
 function readPreview(bookId: string): string | null {
   if (typeof window === 'undefined') return null
@@ -15,7 +15,9 @@ function savePreview(bookId: string, image: HTMLImageElement): string | null {
   try {
     if (!image.naturalWidth || !image.naturalHeight) return null
 
-    const maxWidth = 180
+    // Large enough to look clean while the real IndexedDB cover URL wakes up,
+    // but still compact enough for synchronous localStorage.
+    const maxWidth = 420
     const scale = Math.min(1, maxWidth / image.naturalWidth)
     const width = Math.max(1, Math.round(image.naturalWidth * scale))
     const height = Math.max(1, Math.round(image.naturalHeight * scale))
@@ -27,12 +29,10 @@ function savePreview(bookId: string, image: HTMLImageElement): string | null {
     if (!context) return null
     context.drawImage(image, 0, 0, width, height)
 
-    const dataUrl = canvas.toDataURL('image/webp', 0.72)
+    const dataUrl = canvas.toDataURL('image/webp', 0.84)
     window.localStorage.setItem(`${PREVIEW_PREFIX}${bookId}`, dataUrl)
     return dataUrl
   } catch {
-    // A cover should never fail just because the tiny synchronous preview
-    // cannot be written (storage full, unsupported encoding, etc.).
     return null
   }
 }
@@ -45,21 +45,20 @@ interface BookCoverProps {
 }
 
 /**
- * Cover art that avoids blob-URL flashes across Safari refreshes.
- *
- * The full cover remains stored in IndexedDB. Once it successfully loads, we
- * keep a tiny compressed preview in localStorage, which is synchronous and can
- * paint immediately on the next refresh while IndexedDB recreates the session
- * blob URL. This is display-only and does not touch EPUB or TTS data.
+ * Cover art that paints instantly on Safari refresh without sacrificing quality.
+ * The preview is only a bridge; the original full-resolution EPUB cover always wins
+ * as soon as its current blob URL has actually loaded.
  */
 export function BookCover({ bookId, title, coverUrl, className = '' }: BookCoverProps) {
   const [preview, setPreview] = useState<string | null>(() => readPreview(bookId))
-  const [fullLoaded, setFullLoaded] = useState(false)
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
 
   useEffect(() => {
     setPreview(readPreview(bookId))
-    setFullLoaded(false)
-  }, [bookId, coverUrl])
+    setLoadedUrl(null)
+  }, [bookId])
+
+  const fullLoaded = Boolean(coverUrl && loadedUrl === coverUrl)
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-surface-3">
@@ -74,19 +73,22 @@ export function BookCover({ bookId, title, coverUrl, className = '' }: BookCover
 
       {coverUrl && (
         <img
+          key={coverUrl}
           src={coverUrl}
           alt={title}
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-75 ${
             fullLoaded ? 'opacity-100' : 'opacity-0'
           } ${className}`}
           onLoad={(event) => {
-            setFullLoaded(true)
-            if (!preview) {
-              const cached = savePreview(bookId, event.currentTarget)
-              if (cached) setPreview(cached)
-            }
+            // Track the exact blob URL that loaded. This avoids a Safari/React race
+            // where an effect could reset a boolean after a very fast cached load.
+            setLoadedUrl(coverUrl)
+            const cached = savePreview(bookId, event.currentTarget)
+            if (cached) setPreview(cached)
           }}
-          onError={() => setFullLoaded(false)}
+          onError={() => {
+            if (loadedUrl === coverUrl) setLoadedUrl(null)
+          }}
         />
       )}
     </div>
