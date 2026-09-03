@@ -177,3 +177,4 @@ replaceOnce(
 )
 
 console.log('Applied instant cached cover previews')
+// Trigger workflow after adding workflow definition.
