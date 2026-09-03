@@ -27,3 +27,4 @@ for (const [from, to] of replacements) {
 
 fs.writeFileSync(path, source)
 console.log('Applied mobile cover fit patch')
+// Trigger workflow after it is installed.
