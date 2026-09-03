@@ -197,9 +197,11 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* One-tap navigation from Now Playing (mobile only) */}
+      {/* One-tap navigation from Now Playing (mobile only).
+          The app shell/body already reserves the iPhone safe area, so this bar
+          deliberately does not add a second safe-area bottom inset. */}
       {showPlayerQuickNav && currentBook && (
-        <nav className="flex flex-shrink-0 gap-2 border-t border-border-muted bg-surface-1 px-4 py-2 pb-[env(safe-area-inset-bottom)] md:hidden" aria-label="Player navigation">
+        <nav className="flex flex-shrink-0 gap-2 border-t border-border-muted bg-surface-1 px-4 py-2 md:hidden" aria-label="Player navigation">
           <button
             onClick={() => navigate('/app')}
             className="pressable flex-1 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
