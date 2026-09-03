@@ -12,6 +12,7 @@
 
 import type { AudioBackend, PlayOptions, AudioBackendEvents } from './AudioBackend'
 import { silentAudioKeepalive } from './SilentAudioKeepalive'
+import { usePlayerStore } from '../playerStore'
 
 export class AudioBlobBackend implements AudioBackend {
   private audio: HTMLAudioElement
@@ -47,6 +48,9 @@ export class AudioBlobBackend implements AudioBackend {
 
     this.audio.addEventListener('timeupdate', () => {
       if (this.audio.duration) {
+        // Mirror existing audio timing into the UI store. This is read-only
+        // observation of playback and does not change the narration or audio.
+        usePlayerStore.getState().setChunkTiming(this.audio.currentTime, this.audio.duration)
         this.events.onProgress?.(this.audio.currentTime, this.audio.duration)
       }
     })
@@ -101,6 +105,9 @@ export class AudioBlobBackend implements AudioBackend {
       this.revokeCurrentUrl()
       this.removeAbortHandler()
       this.removePlaybackHandlers()
+
+      // Reset UI timing at the start of each new generated-audio chunk.
+      usePlayerStore.getState().setChunkTiming(options?.startTime ?? 0, 0)
 
       // Create new URL and set source
       this.currentObjectUrl = URL.createObjectURL(blob)
@@ -205,6 +212,7 @@ export class AudioBlobBackend implements AudioBackend {
   stop(): void {
     this.audio.pause()
     this.audio.currentTime = 0
+    usePlayerStore.getState().setChunkTiming(0, 0)
     this._isPlaying = false
     this._isPaused = false
     this.revokeCurrentUrl()
