@@ -8,6 +8,7 @@
 import { hashText } from '@/services/storage'
 import { settingsRepository } from '@/services/storage/settingsRepository'
 import { splitTextIntoChunks } from '@/services/tts/textChunking'
+import { usePlayerStore } from './playerStore'
 
 // ============================================================================
 // Types
@@ -171,7 +172,21 @@ export class ChunkManager {
   getStats(position: ChunkPosition): ChunkStats {
     const total = this.getSectionChunkCount(position.sectionIndex)
     const current = position.chunkIndex + 1
-    const progress = total > 0 ? (position.chunkIndex / total) * 100 : 0
+
+    // Generated-audio engines expose their current chunk timing through the
+    // UI store. Folding that fraction into this UI-only stat lets the existing
+    // whole-book progress bar move smoothly within a chunk without changing
+    // chunk creation, TTS input text, or playback behavior.
+    const playerState = usePlayerStore.getState()
+    const isCurrentStorePosition =
+      playerState.position.sectionIndex === position.sectionIndex &&
+      playerState.position.chunkIndex === position.chunkIndex
+    const chunkFraction = isCurrentStorePosition && playerState.chunkDuration > 0
+      ? Math.max(0, Math.min(1, playerState.position.timeInChunk / playerState.chunkDuration))
+      : 0
+    const progress = total > 0
+      ? ((position.chunkIndex + chunkFraction) / total) * 100
+      : 0
 
     return {
       current,
@@ -189,7 +204,7 @@ export class ChunkManager {
   }
 
   /**
-   * Get chunks ahead of current position (for buffering)
+   * Get chunks ahead of current position
    */
   getChunksAhead(
     position: ChunkPosition,

@@ -18,8 +18,21 @@ export function MiniPlayer() {
     await playbackController.togglePlayback()
   }
 
-  // Calculate progress
-  const progress = playbackController.getProgress() * 100
+  // Match the same text-weighted whole-book calculation used by Now Playing.
+  // getChunkInfo().progress now includes the live fraction through the current
+  // generated-audio chunk, so this bar moves smoothly while listening.
+  const sections = playbackController.getSections()
+  const chunkInfo = playbackController.getChunkInfo()
+  const sectionWeights = sections.map((section) => Math.max(1, section.charCount || 0))
+  const totalBookWeight = sectionWeights.reduce((sum, weight) => sum + weight, 0)
+  const weightBeforeCurrentSection = sectionWeights
+    .slice(0, position.sectionIndex)
+    .reduce((sum, weight) => sum + weight, 0)
+  const currentSectionWeight = sectionWeights[position.sectionIndex] ?? 0
+  const currentSectionProgress = Math.max(0, Math.min(1, chunkInfo.progress / 100))
+  const progress = totalBookWeight > 0
+    ? ((weightBeforeCurrentSection + currentSectionWeight * currentSectionProgress) / totalBookWeight) * 100
+    : 0
 
   return (
     <div
@@ -56,7 +69,7 @@ export function MiniPlayer() {
 
           {/* Progress percentage - desktop only */}
           <span className="hidden text-sm text-text-muted md:block">
-            {Math.round(progress)}%
+            {progress.toFixed(1)}%
           </span>
 
           {/* Play/Pause button */}

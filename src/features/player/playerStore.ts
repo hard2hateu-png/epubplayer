@@ -24,6 +24,9 @@ interface PlayerState {
   volume: number
   error: string | null
 
+  // Live duration of the current generated-audio chunk. UI-only timing data.
+  chunkDuration: number
+
   // Buffering progress
   bufferProgress: number
 
@@ -41,6 +44,7 @@ interface PlayerState {
   setPosition: (position: Partial<PlaybackPosition>) => void
   setSpeed: (speed: number) => void
   setVolume: (volume: number) => void
+  setChunkTiming: (timeInChunk: number, duration: number) => void
   setBufferProgress: (progress: number) => void
   setCurrentSectionTitle: (title: string) => void
   setError: (error: string | null) => void
@@ -61,6 +65,7 @@ export const usePlayerStore = create<PlayerState>()(
       speed: 1.0,
       volume: 1.0,
       error: null,
+      chunkDuration: 0,
       bufferProgress: 0,
       currentSectionTitle: '',
       
@@ -79,6 +84,7 @@ export const usePlayerStore = create<PlayerState>()(
           isPaused: false,
           currentSectionTitle: '',
           error: null,
+          chunkDuration: 0,
           bufferProgress: 0,
         }),
 
@@ -97,6 +103,11 @@ export const usePlayerStore = create<PlayerState>()(
 
       setSpeed: (speed) => set({ speed }),
       setVolume: (volume) => set({ volume }),
+      setChunkTiming: (timeInChunk, duration) =>
+        set((state) => ({
+          position: { ...state.position, timeInChunk: Math.max(0, timeInChunk) },
+          chunkDuration: Math.max(0, duration),
+        })),
       setBufferProgress: (progress) => set({ bufferProgress: progress }),
       setCurrentSectionTitle: (title) => set({ currentSectionTitle: title }),
       setError: (error) => set({ error }),
