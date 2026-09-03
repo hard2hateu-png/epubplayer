@@ -41,3 +41,4 @@ const fs = require('fs')
 }
 
 console.log('Applied reader overlap + progress display polish')
+// Trigger workflow after installation.
