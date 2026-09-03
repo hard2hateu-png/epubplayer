@@ -106,10 +106,10 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
   return (
     <div 
       ref={containerRef}
-      className="flex h-full flex-col items-center justify-center overflow-y-auto px-6 py-8 lg:px-12 lg:py-16"
+      className="relative flex h-full flex-col items-center overflow-y-auto px-6 py-3 lg:px-12 lg:py-8"
     >
-      <div className="max-w-lg text-center lg:max-w-2xl">
-        <p className="text-2xl font-medium leading-relaxed tracking-wide lg:text-3xl lg:leading-loose">
+      <div className="my-auto max-w-lg text-center lg:max-w-2xl">
+        <p className="text-2xl font-medium leading-snug tracking-normal lg:text-3xl lg:leading-normal">
           {words.map((word, index) => {
             const isPast = word.end <= charIndex
             const isActive = index === activeWordIndex
@@ -136,9 +136,9 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
         </p>
       </div>
       
-      {/* Subtle gradient overlays for scroll indication */}
-      <div className="pointer-events-none absolute left-0 right-0 top-0 h-16 bg-gradient-to-b from-surface-1 to-transparent" />
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-surface-0 to-transparent" />
+      {/* Smaller fades preserve the scroll cue without obscuring the text. */}
+      <div className="pointer-events-none absolute left-0 right-0 top-0 h-8 bg-gradient-to-b from-surface-1 to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-surface-0 to-transparent" />
     </div>
   )
 }
