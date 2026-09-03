@@ -47,7 +47,15 @@ export function NowPlayingPage() {
   const [isSlowMode, setIsSlowMode] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState(0)
+  const [coverLoaded, setCoverLoaded] = useState(false)
   const progressBarRef = useRef<HTMLDivElement>(null)
+
+  // A cover blob URL can briefly be unavailable while the app refreshes it
+  // from IndexedDB after a reload. Keep the neutral placeholder visible until
+  // the refreshed image has actually loaded instead of flashing a broken icon.
+  useEffect(() => {
+    setCoverLoaded(false)
+  }, [currentBook?.coverUrl])
   
   // Get sections for chapter list and whole-book progress.
   const sections = playbackController.getSections()
@@ -517,17 +525,21 @@ export function NowPlayingPage() {
               <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-2 lg:w-2/5 lg:flex-none lg:overflow-visible lg:px-0 lg:pt-0">
                 {/* Book cover */}
                 <div className="flex min-h-0 h-full w-full max-w-xs flex-shrink items-center justify-center pb-3 lg:h-auto lg:max-w-md lg:pb-0">
-                  <div className="aspect-square h-[min(32vh,16rem)] w-auto max-h-full max-w-full overflow-hidden rounded-2xl bg-surface-3 shadow-2xl shadow-black/50 lg:h-auto lg:w-full lg:rounded-3xl">
-                    {currentBook.coverUrl ? (
+                  <div className="relative aspect-square h-[min(32vh,16rem)] w-auto max-h-full max-w-full overflow-hidden rounded-2xl bg-surface-3 shadow-2xl shadow-black/50 lg:h-auto lg:w-full lg:rounded-3xl">
+                    <div
+                      className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-accent/20 to-purple-900/30"
+                      aria-hidden="true"
+                    >
+                      <span className="text-6xl opacity-50 lg:text-8xl">📖</span>
+                    </div>
+                    {currentBook.coverUrl && (
                       <img
                         src={currentBook.coverUrl}
                         alt={currentBook.title}
-                        className="h-full w-full object-cover"
+                        onLoad={() => setCoverLoaded(true)}
+                        onError={() => setCoverLoaded(false)}
+                        className={`relative h-full w-full object-cover transition-opacity duration-150 ${coverLoaded ? 'opacity-100' : 'opacity-0'}`}
                       />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-accent/20 to-purple-900/30">
-                        <span className="text-6xl opacity-50 lg:text-8xl">📖</span>
-                      </div>
                     )}
                   </div>
                 </div>
