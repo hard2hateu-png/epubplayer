@@ -49,6 +49,18 @@ export function AppShell() {
           return
         }
 
+        // Refresh only the cover URL in the live player store. Blob URLs are
+        // session-scoped, so a persisted/stale URL can become a broken image
+        // after a reload or deployment. This does not reset playback position.
+        if (fullBook.coverUrl) {
+          usePlayerStore.setState((state) => ({
+            currentBook:
+              state.currentBook?.id === fullBook.id
+                ? { ...state.currentBook, coverUrl: fullBook.coverUrl }
+                : state.currentBook,
+          }))
+        }
+
         // Build the book object for the player (with fresh coverUrl from IndexedDB)
         const bookForPlayer = {
           id: fullBook.id,
@@ -192,13 +204,13 @@ export function AppShell() {
             onClick={() => navigate('/app')}
             className="pressable flex-1 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
           >
-            <Trans>Library</Trans>
+            Library
           </button>
           <button
             onClick={() => navigate(`/app/book/${currentBook.id}`)}
             className="pressable flex-1 rounded-xl bg-surface-2 px-4 py-2.5 text-sm font-medium text-text-secondary hover:text-text-primary"
           >
-            <Trans>Book</Trans>
+            Book
           </button>
         </nav>
       )}
