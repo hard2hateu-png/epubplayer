@@ -5,6 +5,7 @@ on:
     branches: [feature-epub-page-numbers]
     paths:
       - 'scripts/apply-epub-page-numbers.cjs'
+      - 'scripts/fix-epub-page-numbers.cjs'
       - '.github/workflows/apply-epub-page-numbers.yml'
 
 permissions:
@@ -20,7 +21,9 @@ jobs:
           ref: feature-epub-page-numbers
 
       - name: Apply patch
-        run: node scripts/apply-epub-page-numbers.cjs
+        run: |
+          node scripts/apply-epub-page-numbers.cjs
+          node scripts/fix-epub-page-numbers.cjs
 
       - name: Install dependencies
         run: npm ci
