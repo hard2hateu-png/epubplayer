@@ -514,10 +514,10 @@ export function NowPlayingPage() {
             {/* NORMAL MODE: Cover + controls layout */}
             <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:items-center lg:gap-12 lg:px-12">
               {/* Cover art section */}
-              <div className="relative flex min-h-0 flex-1 items-center justify-center px-6 lg:w-2/5 lg:flex-none lg:px-0">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-6 pt-2 lg:w-2/5 lg:flex-none lg:overflow-visible lg:px-0 lg:pt-0">
                 {/* Book cover */}
-                <div className="flex min-h-0 w-full max-w-xs flex-shrink items-center justify-center pb-4 lg:max-w-md lg:pb-0">
-                  <div className="aspect-square w-full max-h-full overflow-hidden rounded-2xl bg-surface-3 shadow-2xl shadow-black/50 lg:rounded-3xl">
+                <div className="flex min-h-0 h-full w-full max-w-xs flex-shrink items-center justify-center pb-3 lg:h-auto lg:max-w-md lg:pb-0">
+                  <div className="aspect-square h-[min(32vh,16rem)] w-auto max-h-full max-w-full overflow-hidden rounded-2xl bg-surface-3 shadow-2xl shadow-black/50 lg:h-auto lg:w-full lg:rounded-3xl">
                     {currentBook.coverUrl ? (
                       <img
                         src={currentBook.coverUrl}
