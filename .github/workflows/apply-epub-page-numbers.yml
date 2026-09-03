@@ -5,6 +5,7 @@ on:
     branches: [feature-epub-page-numbers]
     paths:
       - 'scripts/apply-epub-page-numbers.cjs'
+      - '.github/workflows/apply-epub-page-numbers.yml'
 
 permissions:
   contents: write
