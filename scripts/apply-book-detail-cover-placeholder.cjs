@@ -14,3 +14,4 @@ if (!source.includes(oldBlock)) {
 source = source.replace(oldBlock, newBlock)
 fs.writeFileSync(path, source)
 console.log('Applied book-detail cover placeholder')
+// Trigger workflow after installation.
