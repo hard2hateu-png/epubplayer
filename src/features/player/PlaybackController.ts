@@ -23,7 +23,7 @@ import {
 import type { Section } from '@/services/storage'
 import { ttsManager, type TTSEngine } from '@/services/tts'
 import { settingsRepository } from '@/services/storage/settingsRepository'
-import { enrichSectionsWithPageMarkers } from '@/services/epub/parser'
+import { enrichSectionsWithPageMarkers, EPUB_PAGE_MAP_VERSION } from '@/services/epub/parser'
 import { ttsBufferManager } from './TTSBufferManager'
 import { mediaSessionManager } from './MediaSessionManager'
 import { audioSessionService } from '@/services/audio/audioSessionService'
@@ -171,11 +171,14 @@ class PlaybackController {
       // original stored EPUB. If the EPUB contains no page map/pagebreaks, nothing
       // is displayed and we remember that we already checked.
       const storedBook = await bookRepository.get(book.id)
-      if (storedBook?.pageMapChecked !== true && storedBook?.epubBlob) {
+      if (storedBook?.pageMapVersion !== EPUB_PAGE_MAP_VERSION && storedBook?.epubBlob) {
         try {
           this.sections = await enrichSectionsWithPageMarkers(storedBook.epubBlob, this.sections)
           await sectionRepository.replaceForBook(book.id, this.sections)
-          await bookRepository.update(book.id, { pageMapChecked: true })
+          await bookRepository.update(book.id, {
+            pageMapChecked: true,
+            pageMapVersion: EPUB_PAGE_MAP_VERSION,
+          })
         } catch (error) {
           log.warn('Could not read EPUB page map', error)
         } finally {

@@ -18,6 +18,8 @@ export interface Book {
   totalSections: number
   /** True once the original EPUB has been checked for publisher-provided page markers. */
   pageMapChecked?: boolean
+  /** Detector version used for the last page-map scan. Optional/unindexed for easy upgrades. */
+  pageMapVersion?: number
   addedAt: Date
   lastPlayedAt?: Date
 }
