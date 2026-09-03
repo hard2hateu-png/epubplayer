@@ -1,20 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#6d28d9"/>
+    <linearGradient id="bg" x1="60" y1="40" x2="450" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#251a53"/>
+      <stop offset="1" stop-color="#7139e8"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="96" fill="url(#grad)"/>
-  <g fill="white">
-    <!-- Headphones -->
-    <path d="M256 120c-77.3 0-140 62.7-140 140v100h30v-100c0-60.7 49.3-110 110-110s110 49.3 110 110v100h30V260c0-77.3-62.7-140-140-140z"/>
-    <!-- Left ear cup -->
-    <rect x="116" y="300" width="50" height="80" rx="12"/>
-    <!-- Right ear cup -->
-    <rect x="346" y="300" width="50" height="80" rx="12"/>
-    <!-- Sound waves -->
-    <path d="M256 200c-33.1 0-60 26.9-60 60v20h20v-20c0-22.1 17.9-40 40-40s40 17.9 40 40v20h20v-20c0-33.1-26.9-60-60-60z" opacity="0.7"/>
+  <rect x="12" y="12" width="488" height="488" rx="104" fill="url(#bg)"/>
+  <path d="M142 235c10-65 55-105 114-105s104 40 114 105" fill="none" stroke="#fff" stroke-width="30" stroke-linecap="round"/>
+  <rect x="112" y="248" width="38" height="92" rx="18" fill="#fff" opacity=".96"/>
+  <rect x="362" y="248" width="38" height="92" rx="18" fill="#fff" opacity=".96"/>
+  <path d="M150 230c39 0 72 10 106 31v128c-33-22-67-31-106-31V230Z" fill="#f6f3ff"/>
+  <path d="M362 230c-39 0-72 10-106 31v128c33-22 67-31 106-31V230Z" fill="#ded5ff"/>
+  <path d="M256 261v128" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+  <g stroke="#4b2a91" stroke-width="8" stroke-linecap="round">
+    <path d="M174 279h52M174 306h52M174 333h52"/>
+    <path d="M286 279h52M286 306h52M286 333h52"/>
   </g>
+  <circle cx="346" cy="342" r="42" fill="#8047f5"/>
+  <path d="m335 320 29 22-29 22Z" fill="#fff"/>
+  <path d="m388 94 7 22 22 7-22 7-7 22-7-22-22-7 22-7Z" fill="#fff"/>
+  <path d="m114 126 4 13 13 4-13 4-4 13-4-13-13-4 13-4Z" fill="#e7ddff"/>
 </svg>
-
