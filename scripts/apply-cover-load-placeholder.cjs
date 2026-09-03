@@ -18,3 +18,4 @@ source = source.replace(coverBlock, coverReplacement)
 
 fs.writeFileSync(path, source)
 console.log('Applied cover load placeholder patch')
+// Trigger workflow after workflow installation.
