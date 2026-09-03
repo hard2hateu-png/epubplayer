@@ -3,12 +3,15 @@ import { Trans } from '@lingui/react/macro'
 import { t } from '@lingui/core/macro'
 import { useBook } from './useBook'
 import { playbackController } from '@/features/player/PlaybackController'
+import { usePlayerStore } from '@/features/player/playerStore'
 import { ChevronLeftIcon, PlayIcon, TrashIcon, ListIcon, LoaderIcon, EraserIcon, DownloadIcon, EditIcon } from '@/ui/icons'
 
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
   const navigate = useNavigate()
   const { book, isLoading, deleteBook, deleteAudioCache } = useBook(bookId)
+  const activeBook = usePlayerStore((state) => state.currentBook)
+  const livePosition = usePlayerStore((state) => state.position)
 
   if (isLoading) {
     return (
@@ -79,10 +82,36 @@ export function BookDetailPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Calculate progress
-  const progress = book.playbackState
-    ? Math.round((book.playbackState.sectionIndex / Math.max(1, book.sections.length)) * 100)
-    : 0
+  // Use the same text-weighted whole-book calculation as Now Playing when this
+  // is the active book. For inactive books, fall back to the saved section
+  // boundary, still weighted by text length rather than treating chapters equally.
+  let progressFraction = 0
+  if (activeBook?.id === book.id) {
+    const sections = playbackController.getSections()
+    const chunkInfo = playbackController.getChunkInfo()
+    const sectionWeights = sections.map((section) => Math.max(1, section.charCount || 0))
+    const totalBookWeight = sectionWeights.reduce((sum, weight) => sum + weight, 0)
+    const weightBeforeCurrentSection = sectionWeights
+      .slice(0, livePosition.sectionIndex)
+      .reduce((sum, weight) => sum + weight, 0)
+    const currentSectionWeight = sectionWeights[livePosition.sectionIndex] ?? 0
+    const currentSectionProgress = Math.max(0, Math.min(1, chunkInfo.progress / 100))
+    progressFraction = totalBookWeight > 0
+      ? (weightBeforeCurrentSection + currentSectionWeight * currentSectionProgress) / totalBookWeight
+      : 0
+  } else if (book.playbackState) {
+    const totalBookWeight = book.sections.reduce(
+      (sum, section) => sum + Math.max(1, section.charCount || 0),
+      0
+    )
+    const completedBookWeight = book.sections
+      .slice(0, book.playbackState.sectionIndex)
+      .reduce((sum, section) => sum + Math.max(1, section.charCount || 0), 0)
+    progressFraction = totalBookWeight > 0 ? completedBookWeight / totalBookWeight : 0
+  }
+
+  const progress = Math.max(0, Math.min(100, progressFraction * 100))
+  const progressLabel = progress.toFixed(1)
 
   // Calculate total duration
   const totalDuration = book.sections.reduce((sum, s) => sum + s.estimatedDuration, 0)
@@ -171,7 +200,7 @@ export function BookDetailPage() {
             {progress > 0 && (
               <div className="mb-4 w-full max-w-xs md:max-w-sm">
                 <div className="mb-1 flex justify-between text-xs text-text-muted">
-                  <span><Trans>{progress}% complete</Trans></span>
+                  <span><Trans>{progressLabel}% complete</Trans></span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
                   <div
