@@ -56,7 +56,10 @@ body {
   overscroll-behavior: none;
   position: fixed;
   width: 100%;
-  height: 100%;
+  /* Use the live visual viewport on modern iOS so the app shell reaches the
+     actual bottom edge instead of inheriting a shorter legacy 100% viewport. */
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   margin: 0;
   padding: 0;
