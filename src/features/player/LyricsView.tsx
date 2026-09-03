@@ -208,7 +208,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
       {/* One TTS chunk = one visual page. There is no continuous chapter scroll. */}
       <div
         ref={containerRef}
-        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain px-7 pb-12 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain px-7 pb-8 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
       >
         <div className="my-auto w-full max-w-lg text-center lg:max-w-2xl">
           {usesWordBoundaries ? (
