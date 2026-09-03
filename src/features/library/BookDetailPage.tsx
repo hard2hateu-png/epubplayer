@@ -5,6 +5,7 @@ import { useBook } from './useBook'
 import { playbackController } from '@/features/player/PlaybackController'
 import { usePlayerStore } from '@/features/player/playerStore'
 import { ChevronLeftIcon, PlayIcon, TrashIcon, ListIcon, LoaderIcon, EraserIcon, DownloadIcon, EditIcon } from '@/ui/icons'
+import { BookCover } from '@/ui/components/BookCover'
 
 export function BookDetailPage() {
   const { bookId } = useParams<{ bookId: string }>()
@@ -172,26 +173,7 @@ export function BookDetailPage() {
         <div className="mb-8 flex flex-col items-center text-center md:flex-row md:items-start md:gap-8 md:text-left">
           {/* Cover */}
           <div className="relative mb-6 aspect-[2/3] w-48 flex-shrink-0 overflow-hidden rounded-2xl bg-surface-3 shadow-2xl md:mb-0 md:w-56">
-            {/* Keep a neutral placeholder underneath until the refreshed blob URL
-                has actually loaded. This prevents Safari from flashing its broken-image icon. */}
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-3 to-surface-4">
-              <span className="text-6xl opacity-50">📖</span>
-            </div>
-            {book.coverUrl && (
-              <img
-                src={book.coverUrl}
-                alt={book.title}
-                className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-150"
-                onLoad={(event) => {
-                  event.currentTarget.classList.remove('opacity-0')
-                  event.currentTarget.classList.add('opacity-100')
-                }}
-                onError={(event) => {
-                  event.currentTarget.classList.add('opacity-0')
-                  event.currentTarget.classList.remove('opacity-100')
-                }}
-              />
-            )}
+            <BookCover bookId={book.id} title={book.title} coverUrl={book.coverUrl} />
           </div>
 
           {/* Info */}
