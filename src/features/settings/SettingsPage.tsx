@@ -125,11 +125,11 @@ function isIOSDevice(): boolean {
 function getBufferAheadChoices() {
   if (isIOSDevice()) {
     return [
-      { id: 'minutes:3', label: t`Up to 3 min / 12 chunks`, description: t`Buffers about 3 minutes ahead, with a 12-chunk iPhone safety limit` },
-      { id: 'minutes:10', label: t`Up to 10 min / 12 chunks`, description: t`Buffers until 10 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first` },
-      { id: 'minutes:30', label: t`Up to 30 min / 12 chunks`, description: t`Buffers until 30 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first` },
-      { id: 'chapter', label: t`Chapter + transition`, description: t`Buffers up to 12 chunks from this chapter; if there is room, also readies up to 3 chunks from the next chapter` },
-      { id: 'book', label: t`Next 12 chunks`, description: t`Keeps the next 12 chunks ready and continues across chapter boundaries` },
+      { id: 'minutes:3', label: 'Up to 3 min / 12 chunks', description: 'Buffers about 3 minutes ahead, with a 12-chunk iPhone safety limit' },
+      { id: 'minutes:10', label: 'Up to 10 min / 12 chunks', description: 'Buffers until 10 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first' },
+      { id: 'minutes:30', label: 'Up to 30 min / 12 chunks', description: 'Buffers until 30 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first' },
+      { id: 'chapter', label: 'Chapter + transition', description: 'Buffers up to 12 chunks from this chapter; if there is room, also readies up to 3 chunks from the next chapter' },
+      { id: 'book', label: 'Next 12 chunks', description: 'Keeps up to 12 chunks ready in the current chapter' },
     ]
   }
 
@@ -242,9 +242,9 @@ export function SettingsPage() {
   const getSupertonicDeviceName = (id: string) => getSupertonicDevices().find((d) => d.id === id)?.name || id
   const getBufferAheadLabel = () => {
     if (isIOSDevice()) {
-      if (settings.bufferAheadMode === 'chapter') return t`Chapter + transition`
-      if (settings.bufferAheadMode === 'book') return t`Next 12 chunks`
-      return t`Up to ${settings.bufferAheadMinutes} min / 12 chunks`
+      if (settings.bufferAheadMode === 'chapter') return 'Chapter + transition'
+      if (settings.bufferAheadMode === 'book') return 'Next 12 chunks'
+      return 'Up to ' + settings.bufferAheadMinutes + ' min / 12 chunks'
     }
     if (settings.bufferAheadMode === 'chapter') return t`Entire chapter`
     if (settings.bufferAheadMode === 'book') return t`Entire book (∞)`
@@ -446,7 +446,7 @@ export function SettingsPage() {
               {/* Storage overview */}
               <div className="border-b border-border-muted px-4 py-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-text-primary"><Trans>Browser Storage (estimated)</Trans></span>
+                  <span className="text-text-primary">Safari storage estimate</span>
                   <span className="text-text-secondary">
                     {stats.quotaUsedMB} MB / {stats.quotaTotalMB} MB
                   </span>
@@ -460,14 +460,14 @@ export function SettingsPage() {
                   />
                 </div>
                 <div className="mt-2 text-xs leading-relaxed text-text-muted">
-                  <Trans>Includes your EPUB files, generated audio, TTS/app caches, and other storage used by this app. It will not necessarily match the audio cache below.</Trans>
+                  Safari may undercount IndexedDB audio here. The Generated Audio Cache below is measured directly and is the number to use when clearing narration.
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-sm text-text-primary"><Trans>Generated Audio Cache</Trans></span>
+                  <span className="text-sm text-text-primary">Generated Audio Cache</span>
                   <span className="text-sm text-text-secondary">{stats.totalAudioSizeMB} MB</span>
                 </div>
                 <div className="mt-1 text-xs text-text-muted">
-                  <Trans>{stats.totalChunkCount} cached chunks • {stats.bookCount} books in library</Trans>
+                  {stats.totalChunkCount} cached chunks • {stats.bookCount} books in library
                 </div>
               </div>
 

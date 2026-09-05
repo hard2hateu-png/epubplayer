@@ -12,14 +12,6 @@ function useLogEntries(): LogEntry[] {
   )
 }
 
-function useSubsystems(): string[] {
-  return useSyncExternalStore(
-    (cb) => logStore.subscribe(cb),
-    () => logStore.getSubsystems(),
-    () => [],
-  )
-}
-
 function downloadText(filename: string, text: string) {
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -39,7 +31,10 @@ function formatTimestamp(ts: number): string {
 export function DebugLogsPage() {
   const navigate = useNavigate()
   const entries = useLogEntries()
-  const subsystems = useSubsystems()
+  const subsystems = useMemo(
+    () => Array.from(new Set(entries.map((entry) => entry.subsystem))).sort(),
+    [entries],
+  )
 
   const [query, setQuery] = useState('')
   const [level, setLevel] = useState<'all' | LogEntry['level']>('all')
