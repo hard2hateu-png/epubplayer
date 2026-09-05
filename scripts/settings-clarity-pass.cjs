@@ -63,17 +63,17 @@ replaceInFile(
 `  const getBufferAheadLabel = () => {
     if (settings.bufferAheadMode === 'chapter') return t\`Entire chapter\`
     if (settings.bufferAheadMode === 'book') return t\`Entire book (∞)\`
-    return t\`${settings.bufferAheadMinutes} min\`
+    return t\`\${settings.bufferAheadMinutes} min\`
   }`,
 `  const getBufferAheadLabel = () => {
     if (isIOSDevice()) {
       if (settings.bufferAheadMode === 'chapter') return t\`Chapter + transition\`
       if (settings.bufferAheadMode === 'book') return t\`Next 12 chunks\`
-      return t\`Up to ${settings.bufferAheadMinutes} min / 12 chunks\`
+      return t\`Up to \${settings.bufferAheadMinutes} min / 12 chunks\`
     }
     if (settings.bufferAheadMode === 'chapter') return t\`Entire chapter\`
     if (settings.bufferAheadMode === 'book') return t\`Entire book (∞)\`
-    return t\`${settings.bufferAheadMinutes} min\`
+    return t\`\${settings.bufferAheadMinutes} min\`
   }`,
   'current buffer setting label'
 )
