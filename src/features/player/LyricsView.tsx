@@ -128,7 +128,9 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
       }
 
       updateProgress()
-      const interval = window.setInterval(updateProgress, 150)
+      // 200 ms is responsive enough for sentence highlighting while doing a
+      // little less layout/state work on iOS during long listening sessions.
+      const interval = window.setInterval(updateProgress, 200)
       return () => window.clearInterval(interval)
     }
   }, [])
@@ -173,22 +175,48 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     return Math.min(sentences.length - 1, Math.floor(blobProgress * sentences.length))
   }, [blobProgress, chunkText.length, sentences, usesWordBoundaries])
 
-  // Keep the active item visible inside this single pseudo-page if a particularly
-  // long chunk needs a small amount of internal scrolling.
+  // Keep the active item visible INSIDE the reader's own scroll container.
+  // Using Element.scrollIntoView() could also move ancestor/viewport scrollers on
+  // iOS and a smooth animation could still be running when the next chunk mounted.
   useEffect(() => {
     const active = usesWordBoundaries ? activeWordRef.current : activeSentenceRef.current
     const container = containerRef.current
     if (!active || !container) return
 
-    const containerRect = container.getBoundingClientRect()
-    const activeRect = active.getBoundingClientRect()
-    const isAbove = activeRect.top < containerRect.top + 72
-    const isBelow = activeRect.bottom > containerRect.bottom - 72
+    const frame = window.requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect()
+      const activeRect = active.getBoundingClientRect()
+      const topGuard = 48
+      const bottomGuard = 64
+      const isAbove = activeRect.top < containerRect.top + topGuard
+      const isBelow = activeRect.bottom > containerRect.bottom - bottomGuard
 
-    if (isAbove || isBelow) {
-      active.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [charIndex, activeSentenceIndex, usesWordBoundaries])
+      if (!isAbove && !isBelow) return
+
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight)
+      const activeCenterInScroll =
+        container.scrollTop + (activeRect.top - containerRect.top) + activeRect.height / 2
+      let targetTop = activeCenterInScroll - container.clientHeight / 2
+
+      // Make the final sentence fully visible immediately. This avoids the old
+      // case where a smooth scroll was still finishing when the next visual page
+      // replaced the current chunk.
+      const isFinalSentence =
+        !usesWordBoundaries &&
+        activeSentenceIndex >= 0 &&
+        activeSentenceIndex === sentences.length - 1
+
+      if (isFinalSentence) targetTop = maxScroll
+      targetTop = Math.max(0, Math.min(maxScroll, targetTop))
+
+      container.scrollTo({
+        top: targetTop,
+        behavior: isFinalSentence ? 'auto' : 'smooth',
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeWordIndex, activeSentenceIndex, sentences.length, usesWordBoundaries])
 
   const textSizeClass =
     chunkText.length > 720
@@ -205,66 +233,70 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
         {currentSectionTitle || 'Now Playing'}
       </div>
 
-      {/* One TTS chunk = one visual page. There is no continuous chapter scroll. */}
+      {/* One TTS chunk = one visual page. There is no continuous chapter scroll.
+          The inner min-height wrapper centers short pages without making overflow
+          above/below the scroll container unreachable on iOS. */}
       <div
         ref={containerRef}
-        className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain px-7 pb-8 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-7 pb-10 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
       >
-        <div className="my-auto w-full max-w-lg text-center lg:max-w-2xl">
-          {usesWordBoundaries ? (
-            <p className={`font-serif font-normal tracking-normal text-text-primary ${textSizeClass}`}>
-              {words.map((word, index) => {
-                const isPast = word.end <= charIndex
-                const isActive = index === activeWordIndex
-                const isFuture = word.start > charIndex + charLength
+        <div className="flex min-h-full items-center justify-center py-2">
+          <div className="w-full max-w-lg text-center lg:max-w-2xl">
+            {usesWordBoundaries ? (
+              <p className={`font-serif font-normal tracking-normal text-text-primary ${textSizeClass}`}>
+                {words.map((word, index) => {
+                  const isPast = word.end <= charIndex
+                  const isActive = index === activeWordIndex
+                  const isFuture = word.start > charIndex + charLength
 
-                return (
-                  <span
-                    key={`${index}-${word.start}`}
-                    ref={isActive ? activeWordRef : undefined}
-                    className={`transition-colors duration-150 ${
-                      isActive
-                        ? 'text-accent'
-                        : isPast
-                          ? 'text-text-primary'
-                          : isFuture
-                            ? 'text-text-muted/60'
-                            : 'text-text-secondary'
-                    }`}
-                  >
-                    {word.text}
-                  </span>
-                )
-              })}
-            </p>
-          ) : (
-            <p className={`font-serif font-normal tracking-normal ${textSizeClass}`}>
-              {sentences.map((sentence, index) => {
-                const isPast = index < activeSentenceIndex
-                const isActive = index === activeSentenceIndex
-                const isFuture = index > activeSentenceIndex
+                  return (
+                    <span
+                      key={`${index}-${word.start}`}
+                      ref={isActive ? activeWordRef : undefined}
+                      className={`transition-colors duration-150 ${
+                        isActive
+                          ? 'text-accent'
+                          : isPast
+                            ? 'text-text-primary'
+                            : isFuture
+                              ? 'text-text-muted/60'
+                              : 'text-text-secondary'
+                      }`}
+                    >
+                      {word.text}
+                    </span>
+                  )
+                })}
+              </p>
+            ) : (
+              <p className={`font-serif font-normal tracking-normal ${textSizeClass}`}>
+                {sentences.map((sentence, index) => {
+                  const isPast = index < activeSentenceIndex
+                  const isActive = index === activeSentenceIndex
+                  const isFuture = index > activeSentenceIndex
 
-                return (
-                  <span
-                    key={`${sentence.start}-${sentence.end}`}
-                    ref={isActive ? activeSentenceRef : undefined}
-                    className={`transition-colors duration-200 ${
-                      isActive
-                        ? 'rounded-sm bg-accent/10 text-text-primary'
-                        : isPast
-                          ? 'text-text-secondary'
-                          : isFuture
-                            ? 'text-text-muted/60'
-                            : 'text-text-secondary'
-                    }`}
-                  >
-                    {sentence.text}
-                    {index < sentences.length - 1 ? ' ' : ''}
-                  </span>
-                )
-              })}
-            </p>
-          )}
+                  return (
+                    <span
+                      key={`${sentence.start}-${sentence.end}`}
+                      ref={isActive ? activeSentenceRef : undefined}
+                      className={`transition-colors duration-200 ${
+                        isActive
+                          ? 'rounded-sm bg-accent/10 text-text-primary'
+                          : isPast
+                            ? 'text-text-secondary'
+                            : isFuture
+                              ? 'text-text-muted/60'
+                              : 'text-text-secondary'
+                      }`}
+                    >
+                      {sentence.text}
+                      {index < sentences.length - 1 ? ' ' : ''}
+                    </span>
+                  )
+                })}
+              </p>
+            )}
+          </div>
         </div>
       </div>
     </div>
