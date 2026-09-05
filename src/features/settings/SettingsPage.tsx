@@ -115,7 +115,24 @@ const SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
 // Skip interval options
 const SKIP_INTERVALS = [5, 10, 15, 30, 45, 60]
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 function getBufferAheadChoices() {
+  if (isIOSDevice()) {
+    return [
+      { id: 'minutes:3', label: t`Up to 3 min / 12 chunks`, description: t`Buffers about 3 minutes ahead, with a 12-chunk iPhone safety limit` },
+      { id: 'minutes:10', label: t`Up to 10 min / 12 chunks`, description: t`Buffers until 10 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first` },
+      { id: 'minutes:30', label: t`Up to 30 min / 12 chunks`, description: t`Buffers until 30 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first` },
+      { id: 'chapter', label: t`Chapter + transition`, description: t`Buffers up to 12 chunks from this chapter; if there is room, also readies up to 3 chunks from the next chapter` },
+      { id: 'book', label: t`Next 12 chunks`, description: t`Keeps the next 12 chunks ready and continues across chapter boundaries` },
+    ]
+  }
+
   return [
     { id: 'minutes:3', label: t`3 minutes`, description: t`Good balance (less storage)` },
     { id: 'minutes:10', label: t`10 minutes`, description: t`Smoother playback` },
@@ -224,6 +241,11 @@ export function SettingsPage() {
   const getDeviceName = (id: string) => getProcessingDevices().find((d) => d.id === id)?.name || id
   const getSupertonicDeviceName = (id: string) => getSupertonicDevices().find((d) => d.id === id)?.name || id
   const getBufferAheadLabel = () => {
+    if (isIOSDevice()) {
+      if (settings.bufferAheadMode === 'chapter') return t`Chapter + transition`
+      if (settings.bufferAheadMode === 'book') return t`Next 12 chunks`
+      return t`Up to ${settings.bufferAheadMinutes} min / 12 chunks`
+    }
     if (settings.bufferAheadMode === 'chapter') return t`Entire chapter`
     if (settings.bufferAheadMode === 'book') return t`Entire book (∞)`
     return t`${settings.bufferAheadMinutes} min`
@@ -424,7 +446,7 @@ export function SettingsPage() {
               {/* Storage overview */}
               <div className="border-b border-border-muted px-4 py-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-text-primary"><Trans>Storage Used</Trans></span>
+                  <span className="text-text-primary"><Trans>Browser Storage (estimated)</Trans></span>
                   <span className="text-text-secondary">
                     {stats.quotaUsedMB} MB / {stats.quotaTotalMB} MB
                   </span>
@@ -437,8 +459,15 @@ export function SettingsPage() {
                     style={{ width: `${Math.min(100, stats.quotaPercentUsed)}%` }}
                   />
                 </div>
-                <div className="mt-2 text-xs text-text-muted">
-                  <Trans>{stats.totalAudioSizeMB} MB audio • {stats.totalChunkCount} chunks • {stats.bookCount} books</Trans>
+                <div className="mt-2 text-xs leading-relaxed text-text-muted">
+                  <Trans>Includes your EPUB files, generated audio, TTS/app caches, and other storage used by this app. It will not necessarily match the audio cache below.</Trans>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-sm text-text-primary"><Trans>Generated Audio Cache</Trans></span>
+                  <span className="text-sm text-text-secondary">{stats.totalAudioSizeMB} MB</span>
+                </div>
+                <div className="mt-1 text-xs text-text-muted">
+                  <Trans>{stats.totalChunkCount} cached chunks • {stats.bookCount} books in library</Trans>
                 </div>
               </div>
 

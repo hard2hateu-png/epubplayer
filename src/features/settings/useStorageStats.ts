@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { storageStats, bookRepository } from '@/services/storage'
+import { storageStats, bookRepository, db } from '@/services/storage'
 
 export interface BookStorageInfo {
   id: string
@@ -30,7 +30,7 @@ export function useStorageStats() {
       const overall = await storageStats.getStats()
 
       // Get per-book stats
-      const allBooks = await bookRepository.getAll()
+      const allBooks = await db.books.toArray()
       const bookStats: BookStorageInfo[] = await Promise.all(
         allBooks.map(async (book) => {
           const bookStat = await storageStats.getBookStats(book.id)

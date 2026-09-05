@@ -354,7 +354,12 @@ export class TTSBufferManager {
 
     if (mode === 'book') {
       if (isIOSDevice()) {
-        await pushFrom(startSection, startChunk, IOS_MAX_BUFFER_CHUNKS)
+        let remaining = IOS_MAX_BUFFER_CHUNKS
+        for (let s = startSection; s < allSections.length && remaining > 0; s++) {
+          const before = chunks.length
+          await pushFrom(s, s === startSection ? startChunk : 0, remaining)
+          remaining -= chunks.length - before
+        }
         return chunks
       }
 
