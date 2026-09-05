@@ -45,11 +45,14 @@ export function BookDetailPage() {
       coverUrl: book.coverUrl,
     })
 
-    // Start playback
-    await playbackController.play()
+    // Open Now Playing immediately in the reading/highlight view. Do not wait
+    // for the generated-audio play promise, which can remain pending for the
+    // duration of the current chunk.
+    navigate('/app/playing', { state: { reader: true } })
 
-    // Navigate to Now Playing
-    navigate('/app/playing')
+    // Start playback after navigation has been requested. Playback continues
+    // independently while the Now Playing screen renders.
+    void playbackController.play()
   }
 
   const handleDelete = async () => {

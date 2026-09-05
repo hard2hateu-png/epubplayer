@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Trans } from '@lingui/react/macro'
 import { t } from '@lingui/core/macro'
 import { usePlayerStore } from './playerStore'
@@ -31,6 +31,7 @@ import {
 
 export function NowPlayingPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const currentBook = usePlayerStore((s) => s.currentBook)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
   const speed = usePlayerStore((s) => s.speed)
@@ -44,7 +45,9 @@ export function NowPlayingPage() {
   const [showBookmarks, setShowBookmarks] = useState(false)
   const [showChapters, setShowChapters] = useState(false)
   const [showSpeed, setShowSpeed] = useState(false)
-  const [showLyrics, setShowLyrics] = useState(false)
+  const [showLyrics, setShowLyrics] = useState(
+    () => Boolean((location.state as { reader?: boolean } | null)?.reader)
+  )
   const [isSlowMode, setIsSlowMode] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragProgress, setDragProgress] = useState(0)
