@@ -45,6 +45,18 @@ function estimateDurationSeconds(text: string): number {
   return Math.max(2, text.length / 13)
 }
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+// Neural TTS + large IndexedDB audio caches can put iOS WebKit under severe
+// memory pressure. A couple minutes of look-ahead is plenty for seamless 1.5x
+// playback without continuously generating a whole chapter in the background.
+const IOS_MAX_BUFFER_CHUNKS = 12
+
 export class TTSBufferManager {
   private ctx: BufferContext | null = null
   private isRunning = false
@@ -57,6 +69,10 @@ export class TTSBufferManager {
 
   // In-flight generation dedupe (used by both background buffering and foreground playback)
   private inFlight = new Map<ChunkKey, Promise<GeneratedAudioResult>>()
+
+  // Lightweight session cache. This stores only string keys, never audio Blobs,
+  // so repeated buffer passes do not re-query or materialize large cached audio.
+  private knownCached = new Set<ChunkKey>()
 
   // Telemetry / debugging
   private lastError: string | null = null
@@ -103,6 +119,7 @@ export class TTSBufferManager {
     this.ctx = null
     this.abortController.abort()
     this.inFlight.clear()
+    this.knownCached.clear()
     this.lastError = null
     this.lastBuffered = null
     this.lastTickAt = null
@@ -194,6 +211,7 @@ export class TTSBufferManager {
     )
     
     if (cached) {
+      this.knownCached.add(key)
       const sourceLabel = cacheSource === 'textHash' ? 'GLOBAL_CACHE' : 'CACHE_HIT'
       log.debug('Cache hit', { pos, source, cacheSource: sourceLabel, duration: cached.duration })
       return {
@@ -235,6 +253,7 @@ export class TTSBufferManager {
         audio.blob,
         audio.duration
       )
+      this.knownCached.add(key)
       return audio
     } finally {
       this.inFlight.delete(key)
@@ -313,15 +332,20 @@ export class TTSBufferManager {
     }
 
     if (mode === 'chapter') {
-      // Buffer current chapter
-      await pushFrom(startSection, startChunk)
+      // Desktop can honor full-chapter buffering. On iOS, cap the look-ahead so
+      // Supertonic + cached WAV data cannot steadily push WebKit into a reload.
+      const iosLimit = isIOSDevice() ? IOS_MAX_BUFFER_CHUNKS : undefined
+      await pushFrom(startSection, startChunk, iosLimit)
+
+      if (iosLimit !== undefined && chunks.length >= iosLimit) {
+        return chunks
+      }
       
-      // CROSS-CHAPTER LOOKAHEAD: Always buffer first few chunks of next section
-      // to ensure smooth chapter transitions. This prevents lag when rolling
-      // over to a new chapter.
-      const LOOKAHEAD_CHUNKS = 5 // Buffer first 5 chunks of next chapter
+      // CROSS-CHAPTER LOOKAHEAD: keep a few chunks ready for a seamless rollover.
+      const remainingIOSSlots = iosLimit === undefined ? 5 : Math.max(0, iosLimit - chunks.length)
+      const LOOKAHEAD_CHUNKS = iosLimit === undefined ? 5 : Math.min(3, remainingIOSSlots)
       const nextSection = startSection + 1
-      if (nextSection < allSections.length) {
+      if (LOOKAHEAD_CHUNKS > 0 && nextSection < allSections.length) {
         await pushFrom(nextSection, 0, LOOKAHEAD_CHUNKS)
       }
       
@@ -329,6 +353,11 @@ export class TTSBufferManager {
     }
 
     if (mode === 'book') {
+      if (isIOSDevice()) {
+        await pushFrom(startSection, startChunk, IOS_MAX_BUFFER_CHUNKS)
+        return chunks
+      }
+
       await pushFrom(startSection, startChunk)
       for (let s = startSection + 1; s < allSections.length; s++) {
         await pushFrom(s, 0)
@@ -339,6 +368,7 @@ export class TTSBufferManager {
     // mode === 'minutes'
     // Accumulate until target seconds is reached (heuristic; avoids per-chunk IndexedDB reads).
     const targetSeconds = Math.max(0, minutes) * 60
+    const maxIOSChunks = isIOSDevice() ? IOS_MAX_BUFFER_CHUNKS : Number.POSITIVE_INFINITY
     let acc = 0
 
     const addChunk = (c: ChunkInfo) => {
@@ -355,7 +385,7 @@ export class TTSBufferManager {
         const c = chunkManager.getChunk({ sectionIndex: s, chunkIndex: i })
         if (!c) continue
         addChunk(c)
-        if (acc >= targetSeconds) return chunks
+        if (acc >= targetSeconds || chunks.length >= maxIOSChunks) return chunks
       }
     }
 
@@ -416,37 +446,34 @@ export class TTSBufferManager {
             return
           }
 
-          // Find first missing chunk within target (efficient: per-section cache snapshot)
+          // Find the first missing chunk without loading cached audio Blobs into
+          // memory. The old section snapshot path could materialize hundreds of
+          // MB of WAV data on every buffer pass and trigger iOS WebKit reloads.
           let nextMissing: ChunkInfo | null = null
           let cachedCount = 0
-          const cachedBySection = new Map<
-            number,
-            Promise<Map<number, { textHash: string; duration: number }>>
-          >()
-
-          const getCachedMap = async (sectionIndex: number) => {
-            const existing = cachedBySection.get(sectionIndex)
-            if (existing) return existing
-            const p = audioChunkRepository
-              .getForSection(this.ctx!.bookId, sectionIndex, this.ctx!.voiceId, this.ctx!.modelConfig)
-              .then((chunks) => {
-                const map = new Map<number, { textHash: string; duration: number }>()
-                for (const c of chunks) {
-                  map.set(c.chunkIndex, { textHash: c.textHash, duration: c.duration })
-                }
-                return map
-              })
-            cachedBySection.set(sectionIndex, p)
-            return p
-          }
 
           for (const c of target) {
-            const m = await getCachedMap(c.sectionIndex)
-            const hit = m.get(c.chunkIndex)
-            if (hit && hit.textHash === c.textHash) {
+            const key = makeChunkKey(this.ctx, c)
+            if (this.knownCached.has(key)) {
               cachedCount++
               continue
             }
+
+            const exists = await audioChunkRepository.existsWithFallback(
+              this.ctx.bookId,
+              c.sectionIndex,
+              c.chunkIndex,
+              this.ctx.voiceId,
+              this.ctx.modelConfig,
+              c.textHash
+            )
+
+            if (exists) {
+              this.knownCached.add(key)
+              cachedCount++
+              continue
+            }
+
             nextMissing = c
             break
           }
@@ -469,8 +496,9 @@ export class TTSBufferManager {
           this.lastError = null
           void this.updateBufferIndicator()
 
-          // Yield between chunks to keep UI responsive
-          await this.waitForWakeOrTimeout(0)
+          // Give iOS a small breather between neural generations so WebKit has
+          // time to release temporary inference/audio allocations.
+          await this.waitForWakeOrTimeout(isIOSDevice() ? 40 : 0)
         } catch (e) {
           if (isAbortError(e)) {
             log.debug('Buffer loop aborted')
@@ -509,25 +537,27 @@ export class TTSBufferManager {
       return
     }
 
-    const cached = await audioChunkRepository.getForSection(
-      this.ctx.bookId,
-      sectionIndex,
-      this.ctx.voiceId,
-      this.ctx.modelConfig
-    )
-    const cachedMap = new Map<number, string>()
-    for (const c of cached) cachedMap.set(c.chunkIndex, c.textHash)
-
     let lastContiguous = startChunk - 1
     for (let i = startChunk; i < total; i++) {
       const chunk = chunkManager.getChunk({ sectionIndex, chunkIndex: i })
       if (!chunk) break
-      const hitHash = cachedMap.get(i)
-      if (hitHash && hitHash === chunk.textHash) {
-        lastContiguous = i
-      } else {
-        break
+
+      const key = makeChunkKey(this.ctx, chunk)
+      let exists = this.knownCached.has(key)
+      if (!exists) {
+        exists = await audioChunkRepository.existsWithFallback(
+          this.ctx.bookId,
+          sectionIndex,
+          i,
+          this.ctx.voiceId,
+          this.ctx.modelConfig,
+          chunk.textHash
+        )
+        if (exists) this.knownCached.add(key)
       }
+
+      if (!exists) break
+      lastContiguous = i
     }
 
     const bufferedPercent = Math.max(0, Math.min(100, ((lastContiguous + 1) / total) * 100))

@@ -23,6 +23,7 @@ export class AudioBlobBackend implements AudioBackend {
   private currentAbortHandler: (() => void) | null = null
   private currentPlaybackCleanup: (() => void) | null = null
   private keepaliveStarted = false
+  private lastTimingStoreUpdate = 0
 
   constructor(events?: AudioBackendEvents) {
     if (events) this.events = events
@@ -48,10 +49,15 @@ export class AudioBlobBackend implements AudioBackend {
 
     this.audio.addEventListener('timeupdate', () => {
       if (this.audio.duration) {
-        // Mirror existing audio timing into the UI store. This is read-only
-        // observation of playback and does not change the narration or audio.
-        usePlayerStore.getState().setChunkTiming(this.audio.currentTime, this.audio.duration)
-        this.events.onProgress?.(this.audio.currentTime, this.audio.duration)
+        // The reader highlight reads the audio element directly, so the global
+        // persisted store does not need a write on every native timeupdate.
+        // Throttling this avoids several localStorage serializations per second.
+        const now = performance.now()
+        if (now - this.lastTimingStoreUpdate >= 500) {
+          this.lastTimingStoreUpdate = now
+          usePlayerStore.getState().setChunkTiming(this.audio.currentTime, this.audio.duration)
+          this.events.onProgress?.(this.audio.currentTime, this.audio.duration)
+        }
       }
     })
 
@@ -107,6 +113,7 @@ export class AudioBlobBackend implements AudioBackend {
       this.removePlaybackHandlers()
 
       // Reset UI timing at the start of each new generated-audio chunk.
+      this.lastTimingStoreUpdate = 0
       usePlayerStore.getState().setChunkTiming(options?.startTime ?? 0, 0)
 
       // Create new URL and set source
@@ -212,6 +219,7 @@ export class AudioBlobBackend implements AudioBackend {
   stop(): void {
     this.audio.pause()
     this.audio.currentTime = 0
+    this.lastTimingStoreUpdate = 0
     usePlayerStore.getState().setChunkTiming(0, 0)
     this._isPlaying = false
     this._isPaused = false

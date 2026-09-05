@@ -116,6 +116,30 @@ export const audioChunkRepository = {
   },
 
   /**
+   * Check whether a chunk is available either at this exact position or in the
+   * global text-hash cache. Uses count-only IndexedDB queries so the audio Blob
+   * itself is never materialized into JS memory.
+   */
+  async existsWithFallback(
+    bookId: string,
+    sectionIndex: number,
+    chunkIndex: number,
+    voiceId: string,
+    modelConfig: string,
+    textHash: string
+  ): Promise<boolean> {
+    const id = audioChunkId(bookId, sectionIndex, chunkIndex, voiceId, modelConfig, textHash)
+    const positionCount = await db.audioChunks.where('id').equals(id).count()
+    if (positionCount > 0) return true
+
+    const globalCount = await db.audioChunks
+      .where('[textHash+voiceId+modelConfig]')
+      .equals([textHash, voiceId, modelConfig])
+      .count()
+    return globalCount > 0
+  },
+
+  /**
    * Get all chunks for a section (for sequential playback)
    */
   async getForSection(
@@ -153,16 +177,24 @@ export const audioChunkRepository = {
    * Get total size of cached audio for a book
    */
   async getSizeForBook(bookId: string): Promise<number> {
-    const chunks = await db.audioChunks.where('bookId').equals(bookId).toArray()
-    return chunks.reduce((total, chunk) => total + chunk.audioBlob.size, 0)
+    let total = 0
+    // Cursor iteration avoids holding every cached audio Blob for the book in
+    // one giant JS array at once (important on memory-constrained iOS Safari).
+    await db.audioChunks.where('bookId').equals(bookId).each((chunk) => {
+      total += chunk.audioBlob.size
+    })
+    return total
   },
 
   /**
    * Get total size of all cached audio
    */
   async getTotalSize(): Promise<number> {
-    const chunks = await db.audioChunks.toArray()
-    return chunks.reduce((total, chunk) => total + chunk.audioBlob.size, 0)
+    let total = 0
+    await db.audioChunks.each((chunk) => {
+      total += chunk.audioBlob.size
+    })
+    return total
   },
 
   /**
