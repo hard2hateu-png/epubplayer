@@ -11,6 +11,11 @@ export interface LogEntry {
   source?: string
 }
 
+const PERSIST_KEY = 'epubplayer:recentDebugLogs:v1'
+const PERSIST_ENTRY_LIMIT = 160
+const PERSIST_MESSAGE_LIMIT = 1600
+const PERSIST_INTERVAL_MS = 2000
+
 function formatTs(ts: number): string {
   const d = new Date(ts)
   // Keep this compact and sortable
@@ -37,10 +42,46 @@ function formatMessage(args: unknown[]): string {
   return args.map(safeStringify).join(' ')
 }
 
+function loadPersistedEntries(): LogEntry[] {
+  if (typeof localStorage === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((entry): entry is LogEntry => {
+        return (
+          entry &&
+          typeof entry.id === 'string' &&
+          typeof entry.ts === 'number' &&
+          typeof entry.level === 'string' &&
+          typeof entry.subsystem === 'string' &&
+          typeof entry.message === 'string'
+        )
+      })
+      .slice(-PERSIST_ENTRY_LIMIT)
+  } catch {
+    return []
+  }
+}
+
+function compactEntry(entry: LogEntry): LogEntry {
+  return {
+    id: entry.id,
+    ts: entry.ts,
+    level: entry.level,
+    subsystem: entry.subsystem,
+    message: entry.message.slice(0, PERSIST_MESSAGE_LIMIT),
+    source: entry.source,
+  }
+}
+
 class LogStore {
-  private entries: LogEntry[] = []
+  private entries: LogEntry[] = loadPersistedEntries()
   private listeners = new Set<() => void>()
   private maxEntries = 2000
+  private persistTimer: ReturnType<typeof setTimeout> | null = null
 
   /** @deprecated Use addStructured instead */
   add(level: LogLevel, source: string, ...args: unknown[]) {
@@ -73,11 +114,48 @@ class LogStore {
       this.entries.splice(0, this.entries.length - this.maxEntries)
     }
 
+    if (entry.level === 'error') {
+      this.flushPersistence()
+    } else {
+      this.schedulePersistence()
+    }
+
     for (const l of this.listeners) l()
+  }
+
+  private schedulePersistence() {
+    if (this.persistTimer || typeof localStorage === 'undefined') return
+    this.persistTimer = setTimeout(() => {
+      this.persistTimer = null
+      this.flushPersistence()
+    }, PERSIST_INTERVAL_MS)
+  }
+
+  flushPersistence() {
+    if (typeof localStorage === 'undefined') return
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+      this.persistTimer = null
+    }
+    try {
+      const recent = this.entries.slice(-PERSIST_ENTRY_LIMIT).map(compactEntry)
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(recent))
+    } catch {
+      // Never let debug persistence interfere with playback or app startup.
+    }
   }
 
   clear() {
     this.entries = []
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer)
+      this.persistTimer = null
+    }
+    try {
+      localStorage.removeItem(PERSIST_KEY)
+    } catch {
+      // Ignore storage failures.
+    }
     for (const l of this.listeners) l()
   }
 
@@ -107,5 +185,4 @@ class LogStore {
 }
 
 export const logStore = new LogStore()
-
 
