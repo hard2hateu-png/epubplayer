@@ -181,13 +181,13 @@ export function BookDetailPage() {
             <h1 className="mb-2 text-2xl font-bold text-text-primary md:text-3xl">{book.title}</h1>
             <p className="mb-2 text-text-secondary md:text-lg">{book.author}</p>
             <p className="mb-4 text-sm text-text-muted">
-              <Trans>{book.sections.length} sections · ~{durationText}</Trans>
+              {book.sections.length} sections · ~{durationText}
             </p>
 
             {/* Storage info */}
             {book.storageStats && book.storageStats.audioSizeMB > 0 && (
               <p className="mb-4 text-xs text-text-muted">
-                <Trans>{book.storageStats.audioSizeMB} MB cached audio</Trans>
+                {book.storageStats.audioSizeMB} MB cached audio
               </p>
             )}
 
