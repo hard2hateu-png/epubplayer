@@ -189,3 +189,4 @@ replaceOnce(
 
 fs.writeFileSync(file, text)
 console.log('Reader follow fix applied')
+// Trigger the one-time workflow after its definition exists on main.
