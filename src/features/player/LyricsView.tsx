@@ -6,10 +6,10 @@
  *
  * Browser TTS can provide exact word-boundary events, so we keep word highlighting
  * there. Blob-based engines such as Supertonic/Kokoro do not expose word timings;
- * for those engines we estimate the active sentence from audio time vs duration.
+ * for those engines we estimate a short active phrase from audio time vs duration.
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { playbackController } from './PlaybackController'
 import { BrowserTTSBackend, AudioBlobBackend } from './audioBackends'
 import { usePlayerStore } from './playerStore'
@@ -64,6 +64,67 @@ function splitIntoSentenceRanges(text: string): TextRange[] {
   return ranges
 }
 
+// Generated audio has no exact word timings. Keep the visual highlight small and
+// stable by pre-splitting long sentences into fixed phrase spans. These ranges are
+// display-only; they never alter the chunk sent to the TTS engine.
+function splitIntoHighlightRanges(text: string): TextRange[] {
+  const sentences = splitIntoSentenceRanges(text)
+  const ranges: TextRange[] = []
+  const maxWords = 7
+  const minWordsBeforeNaturalBreak = 4
+
+  for (const sentence of sentences) {
+    const tokens: { text: string; start: number; end: number }[] = []
+    const regex = /\S+/g
+    let match: RegExpExecArray | null
+
+    while ((match = regex.exec(sentence.text)) !== null) {
+      tokens.push({
+        text: match[0],
+        start: match.index,
+        end: match.index + match[0].length,
+      })
+    }
+
+    if (tokens.length <= maxWords) {
+      ranges.push(sentence)
+      continue
+    }
+
+    let tokenIndex = 0
+    while (tokenIndex < tokens.length) {
+      let endToken = Math.min(tokenIndex + maxWords, tokens.length)
+
+      // Prefer a nearby clause boundary so highlights read like natural phrases.
+      if (endToken < tokens.length) {
+        const earliestBreak = tokenIndex + minWordsBeforeNaturalBreak - 1
+        for (let i = endToken - 1; i >= earliestBreak; i--) {
+          const withoutClosingQuote = tokens[i].text.replace(/["'”’)]*$/, '')
+          if (/[,;:—–-]$/.test(withoutClosingQuote)) {
+            endToken = i + 1
+            break
+          }
+        }
+      }
+
+      const localStart = tokens[tokenIndex].start
+      const localEnd = tokens[endToken - 1].end
+      const start = sentence.start + localStart
+      const end = sentence.start + localEnd
+
+      ranges.push({
+        text: text.slice(start, end),
+        start,
+        end,
+      })
+
+      tokenIndex = endToken
+    }
+  }
+
+  return ranges
+}
+
 export function LyricsView({ chunkText }: LyricsViewProps) {
   const [charIndex, setCharIndex] = useState(0)
   const [charLength, setCharLength] = useState(0)
@@ -72,7 +133,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
   const currentSectionTitle = usePlayerStore((s) => s.currentSectionTitle)
   const containerRef = useRef<HTMLDivElement>(null)
   const activeWordRef = useRef<HTMLSpanElement>(null)
-  const activeSentenceRef = useRef<HTMLSpanElement>(null)
+  const activeHighlightRef = useRef<HTMLSpanElement>(null)
 
   // Split text into words while preserving whitespace. This is display-only and
   // does not change the chunk passed to the TTS engine.
@@ -97,11 +158,11 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     return result
   }, [chunkText])
 
-  const sentences = useMemo(() => splitIntoSentenceRanges(chunkText), [chunkText])
+  const highlightRanges = useMemo(() => splitIntoHighlightRanges(chunkText), [chunkText])
 
   // Exact word boundaries are available only for browser TTS. For generated
-  // audio (Supertonic/Kokoro/Piper), poll playback time to estimate which
-  // sentence is currently being spoken. This never seeks or alters playback.
+  // audio (Supertonic/Kokoro/Piper), poll playback time to estimate which fixed
+  // phrase is currently being spoken. This never seeks or alters playback.
   useEffect(() => {
     const backend = playbackController.getAudioBackend()
 
@@ -128,8 +189,6 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
       }
 
       updateProgress()
-      // 200 ms is responsive enough for sentence highlighting while doing a
-      // little less layout/state work on iOS during long listening sessions.
       const interval = window.setInterval(updateProgress, 200)
       return () => window.clearInterval(interval)
     }
@@ -157,9 +216,6 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     return -1
   }, [words, charIndex, usesWordBoundaries])
 
-  // Blob-based engines do not expose word timings. Estimate the current character
-  // from generated-audio time. We still highlight the whole sentence, but this
-  // finer position lets the viewport follow the narration *within* long sentences.
   const estimatedBlobChar = useMemo(() => {
     if (usesWordBoundaries || chunkText.length === 0) return 0
     return Math.min(
@@ -168,20 +224,24 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     )
   }, [blobProgress, chunkText.length, usesWordBoundaries])
 
-  const activeSentenceIndex = useMemo(() => {
-    if (usesWordBoundaries || sentences.length === 0) return -1
+  const activeHighlightIndex = useMemo(() => {
+    if (usesWordBoundaries || highlightRanges.length === 0) return -1
 
-    const exact = sentences.findIndex(
-      (sentence) => estimatedBlobChar >= sentence.start && estimatedBlobChar < sentence.end
+    const exact = highlightRanges.findIndex(
+      (range) => estimatedBlobChar >= range.start && estimatedBlobChar < range.end
     )
-
     if (exact >= 0) return exact
-    return Math.min(sentences.length - 1, Math.floor(blobProgress * sentences.length))
-  }, [blobProgress, estimatedBlobChar, sentences, usesWordBoundaries])
 
-  // A visual page is a TTS chunk. Always start a newly mounted/changed page at
-  // the top before audio-time tracking begins; this prevents scroll carry-over.
-  useEffect(() => {
+    // Whitespace between fixed phrases belongs visually to the phrase just read.
+    const next = highlightRanges.findIndex((range) => estimatedBlobChar < range.start)
+    if (next >= 0) return Math.max(0, next - 1)
+
+    return highlightRanges.length - 1
+  }, [estimatedBlobChar, highlightRanges, usesWordBoundaries])
+
+  // Every TTS chunk is a fresh visual page. Reset the reader before paint so a
+  // previous page's scroll position cannot flash or carry into the next one.
+  useLayoutEffect(() => {
     setCharIndex(0)
     setCharLength(0)
     setBlobProgress(0)
@@ -189,51 +249,41 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     if (container) container.scrollTop = 0
   }, [chunkText])
 
-  // Keep the spoken position visible without changing/splitting the rendered text.
-  // Browser TTS follows its exact word. Generated audio keeps the stable highlighted
-  // sentence intact and estimates a vertical point inside that sentence's box.
+  // Scroll only when the active word/phrase would actually be clipped. Move the
+  // minimum distance needed to reveal it — no continuous tracking and no forced
+  // end-of-page nudge when the current highlight is already visible.
   useEffect(() => {
-    const active = usesWordBoundaries ? activeWordRef.current : activeSentenceRef.current
+    const active = usesWordBoundaries ? activeWordRef.current : activeHighlightRef.current
     const container = containerRef.current
     if (!active || !container) return
 
     const frame = window.requestAnimationFrame(() => {
       const containerRect = container.getBoundingClientRect()
       const activeRect = active.getBoundingClientRect()
-      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight)
+      const topGuard = containerRect.top + 36
+      const bottomGuard = containerRect.bottom - 36
+      let targetTop = container.scrollTop
 
-      let trackedY = activeRect.top + activeRect.height / 2
-
-      if (!usesWordBoundaries && activeSentenceIndex >= 0) {
-        const sentence = sentences[activeSentenceIndex]
-        const sentenceLength = Math.max(1, sentence.end - sentence.start)
-        const progressWithinSentence = Math.max(
-          0,
-          Math.min(1, (estimatedBlobChar - sentence.start) / sentenceLength)
-        )
-        // Approximate the spoken line inside a multi-line sentence without inserting
-        // a moving span into the text (which caused visible Safari reflow/dragging).
-        trackedY = activeRect.top + activeRect.height * progressWithinSentence
+      if (activeRect.top < topGuard) {
+        targetTop -= topGuard - activeRect.top
+      } else if (activeRect.bottom > bottomGuard) {
+        targetTop += activeRect.bottom - bottomGuard
+      } else {
+        return
       }
 
-      const topGuard = containerRect.top + 48
-      const bottomGuard = containerRect.bottom - 72
-      if (trackedY >= topGuard && trackedY <= bottomGuard) return
-
-      const trackedYInScroll = container.scrollTop + (trackedY - containerRect.top)
-      const targetTop = Math.max(
-        0,
-        Math.min(maxScroll, trackedYInScroll - container.clientHeight * 0.42)
-      )
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight)
+      targetTop = Math.max(0, Math.min(maxScroll, targetTop))
+      if (Math.abs(targetTop - container.scrollTop) < 3) return
 
       container.scrollTo({
         top: targetTop,
-        behavior: usesWordBoundaries ? 'smooth' : 'auto',
+        behavior: 'smooth',
       })
     })
 
     return () => window.cancelAnimationFrame(frame)
-  }, [activeWordIndex, activeSentenceIndex, estimatedBlobChar, sentences, usesWordBoundaries])
+  }, [activeWordIndex, activeHighlightIndex, usesWordBoundaries])
 
   const textSizeClass =
     chunkText.length > 720
@@ -250,9 +300,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
         {currentSectionTitle || 'Now Playing'}
       </div>
 
-      {/* One TTS chunk = one visual page. There is no continuous chapter scroll.
-          The inner min-height wrapper centers short pages without making overflow
-          above/below the scroll container unreachable on iOS. */}
+      {/* One TTS chunk = one visual page. There is no continuous chapter scroll. */}
       <div
         ref={containerRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-7 pb-10 pt-2 lg:px-14 lg:pb-16 lg:pt-3"
@@ -287,16 +335,16 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
               </p>
             ) : (
               <p className={`font-serif font-normal tracking-normal ${textSizeClass}`}>
-                {sentences.map((sentence, index) => {
-                  const isPast = index < activeSentenceIndex
-                  const isActive = index === activeSentenceIndex
-                  const isFuture = index > activeSentenceIndex
+                {highlightRanges.map((range, index) => {
+                  const isPast = index < activeHighlightIndex
+                  const isActive = index === activeHighlightIndex
+                  const isFuture = index > activeHighlightIndex
 
                   return (
                     <span
-                      key={`${sentence.start}-${sentence.end}`}
-                      ref={isActive ? activeSentenceRef : undefined}
-                      className={`transition-colors duration-200 ${
+                      key={`${range.start}-${range.end}`}
+                      ref={isActive ? activeHighlightRef : undefined}
+                      className={`transition-colors duration-150 ${
                         isActive
                           ? 'rounded-sm bg-accent/10 text-text-primary'
                           : isPast
@@ -306,8 +354,8 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
                               : 'text-text-secondary'
                       }`}
                     >
-                      {sentence.text}
-                      {index < sentences.length - 1 ? ' ' : ''}
+                      {range.text}
+                      {index < highlightRanges.length - 1 ? ' ' : ''}
                     </span>
                   )
                 })}
