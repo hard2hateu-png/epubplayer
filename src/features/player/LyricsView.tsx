@@ -70,8 +70,10 @@ function splitIntoSentenceRanges(text: string): TextRange[] {
 function splitIntoHighlightRanges(text: string): TextRange[] {
   const sentences = splitIntoSentenceRanges(text)
   const ranges: TextRange[] = []
-  const maxWords = 7
-  const minWordsBeforeNaturalBreak = 4
+  // Slightly longer phrases make the approximate generated-audio tracking feel
+  // steadier at faster playback speeds without returning to huge sentence blocks.
+  const maxWords = 10
+  const minWordsBeforeNaturalBreak = 6
 
   for (const sentence of sentences) {
     const tokens: { text: string; start: number; end: number }[] = []
