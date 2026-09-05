@@ -159,34 +159,27 @@ replaceOnce(
 )
 
 replaceOnce(
-`                  >
-                    {sentence.text}
-                    {index < sentences.length - 1 ? ' ' : ''}
-                  </span>`,
-`                  >
-                    {isActive && !usesWordBoundaries ? (
-                      <>
-                        {sentence.text.slice(
-                          0,
-                          Math.max(0, Math.min(sentence.text.length, estimatedBlobChar - sentence.start))
-                        )}
-                        <span
-                          ref={activePositionRef}
-                          aria-hidden="true"
-                          className="pointer-events-none inline-block h-[1em] w-px align-baseline opacity-0"
-                        />
-                        {sentence.text.slice(
-                          Math.max(0, Math.min(sentence.text.length, estimatedBlobChar - sentence.start))
-                        )}
-                      </>
-                    ) : (
-                      sentence.text
-                    )}
-                    {index < sentences.length - 1 ? ' ' : ''}
-                  </span>`,
+`                      {sentence.text}`,
+`                      {isActive && !usesWordBoundaries ? (
+                        <>
+                          {sentence.text.slice(
+                            0,
+                            Math.max(0, Math.min(sentence.text.length, estimatedBlobChar - sentence.start))
+                          )}
+                          <span
+                            ref={activePositionRef}
+                            aria-hidden="true"
+                            className="pointer-events-none inline-block h-[1em] w-px align-baseline opacity-0"
+                          />
+                          {sentence.text.slice(
+                            Math.max(0, Math.min(sentence.text.length, estimatedBlobChar - sentence.start))
+                          )}
+                        </>
+                      ) : (
+                        sentence.text
+                      )}`,
   'generated-audio position marker rendering'
 )
 
 fs.writeFileSync(file, text)
 console.log('Reader follow fix applied')
-// Trigger the one-time workflow after its definition exists on main.
