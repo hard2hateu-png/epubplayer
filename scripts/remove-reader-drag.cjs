@@ -81,8 +81,6 @@ replaceOnce(
           0,
           Math.min(1, (estimatedBlobChar - sentence.start) / sentenceLength)
         )
-        // Approximate the spoken line inside a multi-line sentence without inserting
-        // a moving span into the text (which caused visible Safari reflow/dragging).
         trackedY = activeRect.top + activeRect.height * progressWithinSentence
       }
 
@@ -132,3 +130,4 @@ replaceOnce(
 
 fs.writeFileSync(file, text)
 console.log('Removed moving inline reader marker; sentence highlight remains stable')
+// Trigger after workflow exists on main.
