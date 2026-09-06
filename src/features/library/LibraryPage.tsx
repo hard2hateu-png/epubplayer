@@ -8,6 +8,7 @@ import { OnboardingSetup } from '@/features/onboarding/OnboardingSetup'
 import { settingsRepository } from '@/services/storage/settingsRepository'
 import { usePWAInstall } from '@/features/pwa/usePWAInstall'
 import { InstallPromptSheet } from '@/features/pwa/InstallPromptSheet'
+import { BookCover } from '@/ui/components/BookCover'
 
 export function LibraryPage() {
   const navigate = useNavigate()
@@ -164,17 +165,12 @@ function BookCard({ book, onClick }: BookCardProps) {
     >
       {/* Cover - horizontal on mobile, larger on desktop */}
       <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface-3 md:h-48 md:w-full">
-        {book.coverUrl ? (
-          <img
-            src={book.coverUrl}
-            alt={book.title}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-3 to-surface-4">
-            <span className="text-2xl opacity-50 md:text-4xl">📖</span>
-          </div>
-        )}
+        <BookCover
+          bookId={book.id}
+          title={book.title}
+          coverUrl={book.coverUrl}
+          className="transition-transform group-hover:scale-105"
+        />
       </div>
 
       {/* Info */}
