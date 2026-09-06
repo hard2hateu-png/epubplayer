@@ -21,17 +21,32 @@ export function AppShell() {
   const [ttsPreloadStatus, setTtsPreloadStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const rehydrationAttempted = useRef(false)
 
-  // Warm the Gutendex cache so Browse loads instantly
+  // Importing/parsing a large file is memory-intensive on iOS. Keep resource-heavy
+  // playback/TTS initialization off Import and Debug Logs so those screens do not
+  // compete with EPUB parsing or immediately refill memory after a WebKit reload.
+  // Once the user leaves these routes, the effects below run normally.
+  const isQuietRoute =
+    location.pathname === '/app/import' || location.pathname === '/app/debug-logs'
+
+  // Warm the Gutendex cache so Browse loads instantly. Skip on quiet routes so an
+  // import/debug session does not do unrelated background work.
   useEffect(() => {
+    if (isQuietRoute) return
     getPopularBooks(1).catch(() => {})
-  }, [])
+  }, [isQuietRoute])
 
   // Rehydrate playback state after page refresh
   // When the store has a persisted currentBook but the controller isn't loaded,
-  // we need to reload the book from IndexedDB to restore full playback capability
+  // we need to reload the book from IndexedDB to restore full playback capability.
+  // Do not do this while importing/debugging; it can start chunk loading/buffering.
   useEffect(() => {
+    if (isQuietRoute) {
+      log.debug('Skipping playback rehydration on quiet route', { path: location.pathname })
+      return
+    }
+
     const rehydratePlayback = async () => {
-      // Only attempt once per app load
+      // Only attempt once per app load, after we reach a normal playback-capable route.
       if (rehydrationAttempted.current) return
       rehydrationAttempted.current = true
 
@@ -41,7 +56,7 @@ export function AppShell() {
       try {
         // Fetch the full book from IndexedDB (includes coverUrl from blob)
         const fullBook = await bookRepository.get(currentBook.id)
-        
+
         if (!fullBook) {
           // Book was deleted - clear the stale state
           log.warn('Persisted book not found in IndexedDB, clearing state', { id: currentBook.id })
@@ -70,11 +85,11 @@ export function AppShell() {
         }
 
         log.info('Rehydrating playback state', { title: fullBook.title })
-        
+
         // Load the book into the playback controller
         // This restores sections, chunks, saved position, etc.
         await playbackController.loadBook(bookForPlayer)
-        
+
         log.info('Playback state rehydrated successfully')
       } catch (err) {
         log.error('Failed to rehydrate playback state', err)
@@ -83,11 +98,17 @@ export function AppShell() {
     }
 
     rehydratePlayback()
-  }, []) // Run once on mount - currentBook comes from persisted zustand state
+  }, [isQuietRoute, location.pathname, currentBook?.id, setCurrentBook])
 
-  // Eager TTS preloading - start model download as soon as app shell mounts
-  // This eliminates the 10+ second wait when user first presses play
+  // Eager TTS preloading - start model download on normal app screens so playback
+  // remains quick, but never compete with file import or crash-log inspection.
   useEffect(() => {
+    if (isQuietRoute) {
+      setTtsPreloadStatus('idle')
+      log.debug('Skipping TTS preload on quiet route', { path: location.pathname })
+      return
+    }
+
     const checkAndPreloadTTS = async () => {
       try {
         const settings = await settingsRepository.getAll()
@@ -108,7 +129,7 @@ export function AppShell() {
           setTtsPreloadStatus('ready')
           return
         }
-        
+
         // If loading (e.g., started by onboarding), just track the status
         if (ttsManager.getIsLoading()) {
           log.debug('TTS already loading, tracking status')
@@ -140,7 +161,7 @@ export function AppShell() {
     }
 
     checkAndPreloadTTS()
-    
+
     // Also poll briefly to catch loading started by onboarding
     // (onboarding starts preload after settings saved, before navigation completes)
     const pollInterval = setInterval(() => {
@@ -156,18 +177,20 @@ export function AppShell() {
         clearInterval(pollInterval)
       }
     }, 500)
-    
+
     // Stop polling after 30 seconds (model should be loaded by then)
     const timeout = setTimeout(() => clearInterval(pollInterval), 30000)
-    
+
     return () => {
       clearInterval(pollInterval)
       clearTimeout(timeout)
     }
-  }, [ttsPreloadStatus])
+  }, [isQuietRoute, location.pathname, ttsPreloadStatus])
 
-  // Hide mini-player on the full Now Playing screen
-  const showMiniPlayer = currentBook && location.pathname !== '/app/playing'
+  // Hide mini-player on the full Now Playing screen. Also hide it on quiet routes
+  // so importing/debugging does not present playback controls while the controller
+  // is intentionally not being rehydrated.
+  const showMiniPlayer = currentBook && location.pathname !== '/app/playing' && !isQuietRoute
 
   // Now Playing page needs full-bleed layout
   const isFullBleed = location.pathname === '/app/playing'
@@ -183,7 +206,7 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col bg-surface-0">
       {/* TTS preload indicator - subtle, non-blocking */}
-      {ttsPreloadStatus === 'loading' && (
+      {ttsPreloadStatus === 'loading' && !isQuietRoute && (
         <div className="flex items-center justify-center gap-2 bg-surface-1 px-3 py-1.5 text-xs text-text-muted">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-accent border-t-transparent" />
           <span><Trans>Loading TTS engine...</Trans></span>
@@ -217,7 +240,7 @@ export function AppShell() {
         </nav>
       )}
 
-      {/* Mini player (shows when a book is active and not on Now Playing page) */}
+      {/* Mini player (shows when a book is active and not on Now Playing/quiet pages) */}
       {showMiniPlayer && <MiniPlayer />}
 
       {/* Bottom tab bar (mobile) + sidebar (desktop) */}
