@@ -11,6 +11,7 @@ export function MiniPlayer() {
   const isPlaying = usePlayerStore((s) => s.isPlaying)
   const isBuffering = usePlayerStore((s) => s.isBuffering)
   const position = usePlayerStore((s) => s.position)
+  const currentSectionTitle = usePlayerStore((s) => s.currentSectionTitle)
 
   if (!currentBook) return null
 
@@ -24,7 +25,6 @@ export function MiniPlayer() {
   // generated-audio chunk, so this bar moves smoothly while listening.
   const sections = playbackController.getSections()
   const chunkInfo = playbackController.getChunkInfo()
-  const epubPage = playbackController.getCurrentEpubPage()
   const sectionWeights = sections.map((section) => Math.max(1, section.charCount || 0))
   const totalBookWeight = sectionWeights.reduce((sum, weight) => sum + weight, 0)
   const weightBeforeCurrentSection = sectionWeights
@@ -53,15 +53,13 @@ export function MiniPlayer() {
             />
           </div>
 
-          {/* Title and info */}
+          {/* Title and chapter */}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-text-primary md:text-base">{currentBook.title}</p>
             <p className="truncate text-xs text-text-secondary md:text-sm">
               {isBuffering
                 ? t`Generating audio...`
-                : epubPage
-                  ? `Chapter ${position.sectionIndex + 1} · Page ${epubPage} · ${currentBook.author}`
-                  : t`Chapter ${position.sectionIndex + 1} · ${currentBook.author}`}
+                : currentSectionTitle || t`Chapter ${position.sectionIndex + 1}`}
             </p>
           </div>
 
