@@ -5,6 +5,8 @@ import { MiniPlayer } from '@/features/player/MiniPlayer'
 import { AppNav } from '@/ui/components/AppNav'
 import { usePlayerStore } from '@/features/player/playerStore'
 import { playbackController } from '@/features/player/PlaybackController'
+import { playbackStateMachine } from '@/features/player/PlaybackStateMachine'
+import { ttsBufferManager } from '@/features/player/TTSBufferManager'
 import { ttsManager } from '@/services/tts'
 import { settingsRepository } from '@/services/storage/settingsRepository'
 import { bookRepository } from '@/services/storage'
@@ -20,6 +22,7 @@ export function AppShell() {
   const setCurrentBook = usePlayerStore((s) => s.setCurrentBook)
   const [ttsPreloadStatus, setTtsPreloadStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const rehydrationAttempted = useRef(false)
+  const quietRouteSuspended = useRef(false)
 
   // Importing/parsing a large file is memory-intensive on iOS. Keep resource-heavy
   // playback/TTS initialization off Import and Debug Logs so those screens do not
@@ -27,6 +30,38 @@ export function AppShell() {
   // Once the user leaves these routes, the effects below run normally.
   const isQuietRoute =
     location.pathname === '/app/import' || location.pathname === '/app/debug-logs'
+
+  // A quiet route must also stop work that was ALREADY running before navigation.
+  // Merely skipping new preload/rehydration is not enough: an in-flight WebGPU model
+  // load or buffer loop can continue consuming memory while an EPUB is being parsed.
+  useEffect(() => {
+    if (!isQuietRoute) {
+      quietRouteSuspended.current = false
+      return
+    }
+
+    if (quietRouteSuspended.current) return
+    quietRouteSuspended.current = true
+
+    log.info('Suspending playback/TTS for quiet route', { path: location.pathname })
+
+    // Preserve the current position, stop any audible playback, and then stop all
+    // background generation. savePosition() captures its values synchronously before
+    // its IndexedDB write, so unloading the state machine immediately afterwards is safe.
+    playbackController.stop()
+    ttsBufferManager.stop()
+    ttsManager.cancelAll()
+    ttsManager.destroy()
+
+    // Return the controller to a clean idle state. Keep currentBook in Zustand so
+    // leaving Import/Debug Logs can rehydrate the same book and saved position.
+    if (!playbackStateMachine.isIdle()) {
+      playbackStateMachine.dispatch({ type: 'UNLOAD' })
+    }
+
+    rehydrationAttempted.current = false
+    setTtsPreloadStatus('idle')
+  }, [isQuietRoute, location.pathname])
 
   // Warm the Gutendex cache so Browse loads instantly. Skip on quiet routes so an
   // import/debug session does not do unrelated background work.
@@ -109,9 +144,13 @@ export function AppShell() {
       return
     }
 
+    let cancelled = false
+
     const checkAndPreloadTTS = async () => {
       try {
         const settings = await settingsRepository.getAll()
+        if (cancelled) return
+
         const engine = settings.ttsEngine
         const capabilities = ttsManager.getEngineCapabilities(engine)
 
@@ -119,40 +158,44 @@ export function AppShell() {
         // Browser TTS is instant and doesn't need preloading
         if (!capabilities.requiresInit) {
           log.debug('TTS engine does not require preloading', { engine })
-          setTtsPreloadStatus('ready')
+          if (!cancelled) setTtsPreloadStatus('ready')
           return
         }
 
         // If already ready, we're done
         if (ttsManager.getIsReady()) {
           log.debug('TTS already ready')
-          setTtsPreloadStatus('ready')
+          if (!cancelled) setTtsPreloadStatus('ready')
           return
         }
 
         // If loading (e.g., started by onboarding), just track the status
         if (ttsManager.getIsLoading()) {
           log.debug('TTS already loading, tracking status')
-          setTtsPreloadStatus('loading')
+          if (!cancelled) setTtsPreloadStatus('loading')
           // Wait for it to complete
           try {
             await ttsManager.initialize() // Will return existing promise
-            setTtsPreloadStatus('ready')
+            if (!cancelled) setTtsPreloadStatus('ready')
           } catch {
-            setTtsPreloadStatus('error')
+            if (!cancelled) setTtsPreloadStatus('error')
           }
           return
         }
 
         // Start preloading
         log.info('Preloading TTS engine', { engine })
-        setTtsPreloadStatus('loading')
+        if (!cancelled) setTtsPreloadStatus('loading')
 
         await ttsManager.initialize()
+        if (cancelled) return
 
         log.info('TTS preload complete', { engine })
         setTtsPreloadStatus('ready')
       } catch (err) {
+        // Navigating into a quiet route intentionally destroys an in-flight worker.
+        // Do not turn that expected cancellation into a visible preload error.
+        if (cancelled) return
         log.error('TTS preload failed', err)
         setTtsPreloadStatus('error')
         // Don't throw - preload failure shouldn't break the app
@@ -165,12 +208,17 @@ export function AppShell() {
     // Also poll briefly to catch loading started by onboarding
     // (onboarding starts preload after settings saved, before navigation completes)
     const pollInterval = setInterval(() => {
+      if (cancelled) return
       if (ttsManager.getIsLoading() && ttsPreloadStatus !== 'loading') {
         setTtsPreloadStatus('loading')
         // Wait for completion
         ttsManager.initialize()
-          .then(() => setTtsPreloadStatus('ready'))
-          .catch(() => setTtsPreloadStatus('error'))
+          .then(() => {
+            if (!cancelled) setTtsPreloadStatus('ready')
+          })
+          .catch(() => {
+            if (!cancelled) setTtsPreloadStatus('error')
+          })
         clearInterval(pollInterval)
       } else if (ttsManager.getIsReady() && ttsPreloadStatus === 'loading') {
         setTtsPreloadStatus('ready')
@@ -182,6 +230,7 @@ export function AppShell() {
     const timeout = setTimeout(() => clearInterval(pollInterval), 30000)
 
     return () => {
+      cancelled = true
       clearInterval(pollInterval)
       clearTimeout(timeout)
     }
