@@ -21,20 +21,41 @@ export const storageStats = {
    * Get storage usage statistics
    */
   async getStats() {
-    const [bookCount, audioSize, chunkCount] = await Promise.all([
+    // Safari/iOS can substantially under-report IndexedDB Blob usage through
+    // navigator.storage.estimate(). Measure the large payloads we control directly
+    // so the displayed "used" total can never be smaller than its own audio cache.
+    const storedBookPayloadPromise = (async () => {
+      let total = 0
+      await db.books.each((book) => {
+        total += book.epubBlob?.size ?? 0
+        total += book.coverBlob?.size ?? 0
+      })
+      return total
+    })()
+
+    const [bookCount, audioSize, chunkCount, storedBookPayloadSize] = await Promise.all([
       db.books.count(),
       audioChunkRepository.getTotalSize(),
       db.audioChunks.count(),
+      storedBookPayloadPromise,
     ])
 
-    // Get browser storage estimate if available
-    let quotaUsed = 0
+    // Get Safari/browser quota information when available. Its total quota is useful,
+    // but its usage number is only a lower-confidence estimate on iOS.
+    let browserReportedUsage = 0
     let quotaTotal = 0
     if ('storage' in navigator && 'estimate' in navigator.storage) {
       const estimate = await navigator.storage.estimate()
-      quotaUsed = estimate.usage ?? 0
+      browserReportedUsage = estimate.usage ?? 0
       quotaTotal = estimate.quota ?? 0
     }
+
+    // Directly known payload = generated audio + original EPUB files + cover images.
+    // Use the larger of this and Safari's own reported usage. This avoids double
+    // counting if Safari does include IndexedDB correctly, while also fixing the
+    // impossible case where "total used" was smaller than generated audio alone.
+    const measuredPayloadUsage = audioSize + storedBookPayloadSize
+    const quotaUsed = Math.max(browserReportedUsage, measuredPayloadUsage)
 
     return {
       bookCount,
@@ -45,7 +66,7 @@ export const storageStats = {
       quotaUsedMB: Math.round(quotaUsed / 1024 / 1024),
       quotaTotal,
       quotaTotalMB: Math.round(quotaTotal / 1024 / 1024),
-      quotaPercentUsed: quotaTotal > 0 ? Math.round((quotaUsed / quotaTotal) * 100) : 0,
+      quotaPercentUsed: quotaTotal > 0 ? (quotaUsed / quotaTotal) * 100 : 0,
     }
   },
 
