@@ -45,20 +45,25 @@ interface BookCoverProps {
 }
 
 /**
- * Cover art that paints instantly on Safari refresh without sacrificing quality.
- * The preview is only a bridge; the original full-resolution EPUB cover always wins
- * as soon as its current blob URL has actually loaded.
+ * Safari can occasionally restore/reuse a valid blob image without delivering the
+ * React load event in the order we expect. Never make the real cover depend on that
+ * event for visibility: paint it immediately and keep a small local preview behind it
+ * as a fallback if the runtime blob URL fails.
  */
 export function BookCover({ bookId, title, coverUrl, className = '' }: BookCoverProps) {
   const [preview, setPreview] = useState<string | null>(() => readPreview(bookId))
-  const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
 
   useEffect(() => {
     setPreview(readPreview(bookId))
-    setLoadedUrl(null)
   }, [bookId])
 
-  const fullLoaded = Boolean(coverUrl && loadedUrl === coverUrl)
+  useEffect(() => {
+    // A refreshed object URL gets a fresh chance to load.
+    setFailedUrl(null)
+  }, [coverUrl])
+
+  const fullFailed = Boolean(coverUrl && failedUrl === coverUrl)
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-surface-3">
@@ -71,24 +76,17 @@ export function BookCover({ bookId, title, coverUrl, className = '' }: BookCover
         />
       )}
 
-      {coverUrl && (
+      {coverUrl && !fullFailed && (
         <img
           key={coverUrl}
           src={coverUrl}
           alt={title}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-75 ${
-            fullLoaded ? 'opacity-100' : 'opacity-0'
-          } ${className}`}
+          className={`absolute inset-0 h-full w-full object-cover ${className}`}
           onLoad={(event) => {
-            // Track the exact blob URL that loaded. This avoids a Safari/React race
-            // where an effect could reset a boolean after a very fast cached load.
-            setLoadedUrl(coverUrl)
             const cached = savePreview(bookId, event.currentTarget)
             if (cached) setPreview(cached)
           }}
-          onError={() => {
-            if (loadedUrl === coverUrl) setLoadedUrl(null)
-          }}
+          onError={() => setFailedUrl(coverUrl)}
         />
       )}
     </div>
