@@ -60,6 +60,7 @@ export function NowPlayingPage() {
   // Chunk progress is still useful internally, but the visible scrubber is book-wide.
   const chunkInfo = playbackController.getChunkInfo()
   const chunkText = playbackController.getCurrentChunkText()
+  const epubPage = playbackController.getCurrentEpubPage()
 
   // Weight whole-book progress by the amount of text in each section so a short
   // chapter does not count the same as a long one.
@@ -366,10 +367,11 @@ export function NowPlayingPage() {
                       aria-hidden="true"
                     />
                   </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-text-muted" aria-hidden="true">
-                    <span className="min-w-0 flex-1 truncate pr-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs text-text-muted" aria-hidden="true">
+                    <span className="min-w-0 truncate pr-2">
                       {currentSectionTitle || (chapterCount > 0 ? `Chapter ${chapterNumber}` : t`Loading...`)}
                     </span>
+                    {epubPage ? <span className="flex-shrink-0 text-center">Page {epubPage}</span> : <span />}
                     <span className="flex-shrink-0 text-right">{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                 </div>
@@ -464,7 +466,7 @@ export function NowPlayingPage() {
                       {/* Whole-book progress bar */}
                       <div className="flex w-full max-w-md items-center gap-3">
                         <span className="w-16 text-right text-xs text-text-muted" aria-hidden="true">
-                          {chapterCount > 0 ? `Ch ${chapterNumber}/${chapterCount}` : '—'}
+                          {epubPage ? `Page ${epubPage}` : chapterCount > 0 ? `Ch ${chapterNumber}/${chapterCount}` : '—'}
                         </span>
                         <div 
                           ref={progressBarRef}
@@ -596,10 +598,11 @@ export function NowPlayingPage() {
                   </div>
                   
                   {/* Progress info */}
-                  <div className="flex items-center justify-between gap-3 text-xs text-text-muted lg:text-sm">
-                    <span className="min-w-0 flex-1 truncate pr-2">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 text-xs text-text-muted lg:text-sm">
+                    <span className="min-w-0 truncate pr-2">
                       {currentSectionTitle || (chapterCount > 0 ? `Chapter ${chapterNumber}` : t`Loading...`)}
                     </span>
+                    {epubPage ? <span className="flex-shrink-0 text-center">Page {epubPage}</span> : <span />}
                     <span className="flex-shrink-0 text-right">{`${bookProgress.toFixed(1)}%`}</span>
                   </div>
                   
