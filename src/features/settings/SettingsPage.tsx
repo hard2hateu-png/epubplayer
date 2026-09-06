@@ -446,7 +446,7 @@ export function SettingsPage() {
               {/* Storage overview */}
               <div className="border-b border-border-muted px-4 py-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="text-text-primary">Safari storage estimate</span>
+                  <span className="text-text-primary">App storage used</span>
                   <span className="text-text-secondary">
                     {stats.quotaUsedMB} MB / {stats.quotaTotalMB} MB
                   </span>
@@ -460,7 +460,7 @@ export function SettingsPage() {
                   />
                 </div>
                 <div className="mt-2 text-xs leading-relaxed text-text-muted">
-                  Safari may undercount IndexedDB audio here. The Generated Audio Cache below is measured directly and is the number to use when clearing narration.
+                  Includes directly measured generated audio plus stored EPUB and cover files. Safari's own IndexedDB estimate is used only when it reports a larger total.
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <span className="text-sm text-text-primary">Generated Audio Cache</span>
