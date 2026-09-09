@@ -4,9 +4,9 @@ import { Trans } from '@lingui/react/macro'
 import { t } from '@lingui/core/macro'
 import { useStorageStats } from './useStorageStats'
 import { PocketVoiceSetupSheet } from './PocketVoiceSetupSheet'
-import { QwenCloudSetupSheet } from './QwenCloudSetupSheet'
+import { VoiceboxRemoteSetupSheet } from './VoiceboxRemoteSetupSheet'
 import { settingsRepository, DEFAULT_SETTINGS, type SettingKey } from '@/services/storage/settingsRepository'
-import { ttsManager, pocketService, qwenCloudService, type TTSEngine } from '@/services/tts'
+import { ttsManager, pocketService, voiceboxRemoteService, type TTSEngine } from '@/services/tts'
 import { PIPER_MODELS } from '@/services/tts/piperService'
 import { SUPERTONIC_VOICES } from '@/services/tts/supertonicService'
 import { SHERPA_VOICES } from '@/services/tts/sherpaService'
@@ -34,7 +34,7 @@ function getTTSEngines() {
   return [
     { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
     { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
-    { id: 'qwen' as TTSEngine, name: t`Qwen3-TTS Cloud (Leo)`, description: t`Higher-quality Leo voice clone. Runs remotely so the heavy model never loads on your iPhone.` },
+    { id: 'voicebox' as TTSEngine, name: t`Voicebox + Qwen3-TTS (Leo)`, description: t`Free/open-source Leo clone using a remote GPU such as a free Google Colab session.` },
     { id: 'pocket' as TTSEngine, name: t`Pocket TTS (Leo)`, description: t`Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use.` },
     { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
     { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
@@ -158,6 +158,21 @@ export function SettingsPage() {
   const [browserVoices, setBrowserVoices] = useState<{ id: string; name: string }[]>([])
   const [pocketVoiceInstalled, setPocketVoiceInstalled] = useState<boolean | null>(null)
 
+  // One-tap pairing from the free Colab notebook. URL fragments stay client-side.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '')
+    const voiceboxUrl = params.get('voiceboxUrl')
+    const voiceboxToken = params.get('voiceboxToken')
+    if (!voiceboxUrl || !voiceboxToken) return
+    try {
+      voiceboxRemoteService.configure(voiceboxUrl, voiceboxToken)
+      setActiveSheet('voiceboxLeo')
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    } catch {
+      // Leave manual fields available in the setup sheet if pairing data is malformed.
+    }
+  }, [])
+
   // Load settings on mount
   useEffect(() => {
     settingsRepository.getAll().then((s) => {
@@ -223,7 +238,7 @@ export function SettingsPage() {
   }
 
   const getVoiceName = (id: string) => {
-    if (settings.ttsEngine === 'pocket' || settings.ttsEngine === 'qwen') {
+    if (settings.ttsEngine === 'pocket' || settings.ttsEngine === 'voicebox') {
       return 'Leo'
     }
     if (settings.ttsEngine === 'browser') {
@@ -323,13 +338,13 @@ export function SettingsPage() {
             onClick={() => setActiveSheet('ttsEngine')}
           />
 
-          {settings.ttsEngine !== 'qwen' && (
+          {settings.ttsEngine !== 'voicebox' && (
             <SettingsItem
               icon={<VolumeIcon className="h-5 w-5" />}
-              label={t`Qwen3-TTS — Leo`}
-              value={qwenCloudService.hasToken() ? t`Configured` : t`Set up`}
-              description={t`Higher-quality cloud Leo clone; no neural model runs on this iPhone`}
-              onClick={() => setActiveSheet('qwenLeo')}
+              label={t`Voicebox — Leo`}
+              value={voiceboxRemoteService.hasConfig() ? t`Paired` : t`Set up`}
+              description={t`Free/open-source Voicebox + Qwen3-TTS using a remote Colab GPU`}
+              onClick={() => setActiveSheet('voiceboxLeo')}
             />
           )}
 
@@ -385,19 +400,19 @@ export function SettingsPage() {
               />
             </>
           )}
-          {settings.ttsEngine === 'qwen' && (
+          {settings.ttsEngine === 'voicebox' && (
             <>
               <SettingsItem
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value="Leo"
-                description={t`Qwen3-TTS cloud voice clone`}
-                onClick={() => setActiveSheet('qwenLeo')}
+                description={t`Voicebox Qwen3-TTS 1.7B clone`}
+                onClick={() => setActiveSheet('voiceboxLeo')}
               />
               <SettingsItem
                 label={t`Buffer Ahead`}
                 value={getBufferAheadLabel()}
-                description={t`Generated cloud audio is cached on this device for smooth playback`}
+                description={t`Generated Voicebox audio is cached on this iPhone for smooth playback`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -635,7 +650,7 @@ export function SettingsPage() {
               settings.ttsEngine === 'browser' ? 'Web Speech API' :
               settings.ttsEngine === 'piper' ? 'Piper VITS' :
               settings.ttsEngine === 'supertonic' ? 'Supertonic 66M' :
-              settings.ttsEngine === 'qwen' ? 'Qwen3-TTS Cloud — Leo' :
+              settings.ttsEngine === 'voicebox' ? 'Voicebox + Qwen3-TTS — Leo' :
               settings.ttsEngine === 'pocket' ? 'Pocket TTS — Leo' :
               settings.ttsEngine === 'sherpa' ? 'Sherpa-ONNX' :
               settings.ttsEngine === 'kitten' ? 'KittenTTS Nano 15M' :
@@ -657,8 +672,8 @@ export function SettingsPage() {
         onInstalledChange={setPocketVoiceInstalled}
       />
 
-      <QwenCloudSetupSheet
-        isOpen={activeSheet === 'qwenLeo'}
+      <VoiceboxRemoteSetupSheet
+        isOpen={activeSheet === 'voiceboxLeo'}
         onClose={() => setActiveSheet(null)}
       />
 
@@ -693,10 +708,10 @@ export function SettingsPage() {
             }
           }
           
-          if (engine === 'qwen') {
-            const hasReference = await qwenCloudService.hasLeoReference()
-            if (!hasReference || !qwenCloudService.hasToken()) {
-              setActiveSheet('qwenLeo')
+          if (engine === 'voicebox') {
+            const hasReference = await voiceboxRemoteService.hasLeoReference()
+            if (!hasReference || !voiceboxRemoteService.hasConfig()) {
+              setActiveSheet('voiceboxLeo')
               return
             }
           }
@@ -723,16 +738,16 @@ export function SettingsPage() {
             // Unique cache identity for Leo. Pocket itself always uses the local Leo clone.
             await settingsRepository.set('voiceId', 'pocket:leo')
             setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
-          } else if (engine === 'qwen') {
-            await settingsRepository.set('voiceId', 'qwen:leo')
-            setSettings((prev) => ({ ...prev, voiceId: 'qwen:leo' }))
+          } else if (engine === 'voicebox') {
+            await settingsRepository.set('voiceId', 'voicebox:leo')
+            setSettings((prev) => ({ ...prev, voiceId: 'voicebox:leo' }))
           }
 
           // Custom Leo engines use distinct generated-audio cache identities. Reload once
           // when switching to/from either one so PlaybackController cannot retain the old voice.
           const switchingToOrFromCustomLeo =
-            engine === 'pocket' || engine === 'qwen' ||
-            settings.ttsEngine === 'pocket' || settings.ttsEngine === 'qwen'
+            engine === 'pocket' || engine === 'voicebox' ||
+            settings.ttsEngine === 'pocket' || settings.ttsEngine === 'voicebox'
           if (switchingToOrFromCustomLeo) {
             await settingsRepository.set('ttsEngine', engine)
             setSettings((prev) => ({ ...prev, ttsEngine: engine }))

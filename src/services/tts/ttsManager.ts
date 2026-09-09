@@ -16,7 +16,7 @@ import { supertonicService } from './supertonicService'
 import { sherpaService } from './sherpaService'
 import { kittenService } from './kittenService'
 import { pocketService } from './pocketService'
-import { qwenCloudService } from './qwenCloudService'
+import { voiceboxRemoteService } from './voiceboxRemoteService'
 import type {
   TTSEngine,
   TTSEngineInfo,
@@ -66,10 +66,10 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
       slowOnCPU: false,       // Fast on both WebGPU and WASM
     },
   },
-  qwen: {
-    id: 'qwen',
-    name: 'Qwen3-TTS Cloud (Leo)',
-    description: 'Higher-quality Leo voice clone. Neural inference runs in the cloud instead of on your iPhone.',
+  voicebox: {
+    id: 'voicebox',
+    name: 'Voicebox (Leo)',
+    description: 'Free/open-source Voicebox + Qwen3-TTS on a remote GPU such as Google Colab.',
     available: true,
     capabilities: {
       generatesBlobs: true,
@@ -275,9 +275,9 @@ class TTSManager {
           await pocketService.initialize()
           break
 
-        case 'qwen':
-          this.wireUpService(qwenCloudService, 'qwen')
-          await qwenCloudService.initialize()
+        case 'voicebox':
+          this.wireUpService(voiceboxRemoteService, 'voicebox')
+          await voiceboxRemoteService.initialize()
           break
 
         case 'browser':
@@ -416,8 +416,8 @@ class TTSManager {
           }
         }
 
-        case 'qwen': {
-          const result = await qwenCloudService.generateChunk(text, chunkIndex)
+        case 'voicebox': {
+          const result = await voiceboxRemoteService.generateChunk(text, chunkIndex)
           return {
             requestId: result.requestId,
             blob: result.blob,
@@ -451,8 +451,8 @@ class TTSManager {
         return kittenService.splitIntoChunks(text)
       case 'pocket':
         return pocketService.splitIntoChunks(text)
-      case 'qwen':
-        return qwenCloudService.splitIntoChunks(text)
+      case 'voicebox':
+        return voiceboxRemoteService.splitIntoChunks(text)
       default:
         return kokoroTTS.splitIntoChunks(text)
     }
@@ -505,8 +505,8 @@ class TTSManager {
       case 'pocket':
         pocketService.cancelAll()
         break
-      case 'qwen':
-        qwenCloudService.cancelAll()
+      case 'voicebox':
+        voiceboxRemoteService.cancelAll()
         break
     }
   }
@@ -531,8 +531,8 @@ class TTSManager {
       case 'pocket':
         pocketService.destroy()
         break
-      case 'qwen':
-        qwenCloudService.destroy()
+      case 'voicebox':
+        voiceboxRemoteService.destroy()
         break
     }
     this.isInitialized = false
