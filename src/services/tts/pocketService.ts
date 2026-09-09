@@ -14,11 +14,12 @@ const VOICE_CACHE = 'epub-player-pocket-voices-v2'
 const LEGACY_VOICE_CACHE = 'epub-player-pocket-voices-v1'
 const LEGACY_REFERENCE_PATH = '/__epubplayer/pocket/voices/leo'
 const REFERENCE_PATH = '/__epubplayer/pocket/voices/leo-reference-v2'
-const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v2-full'
+const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v3-single-30s'
 const VOICE_REF = 'custom:leo'
-const EMBEDDING_MAGIC = 'LEOEMB02'
+const EMBEDDING_MAGIC = 'LEOEMB03'
 const SAMPLE_RATE = 24_000
 const REFERENCE_SECONDS = 42.65
+const CONDITIONING_SECONDS = 30
 const MAX_CHUNK_CHARS = 220
 
 export interface PocketConfig { maxChunkChars: number }
@@ -44,23 +45,6 @@ function isIOSDevice(): boolean {
   const ua = navigator.userAgent || ''
   return /iPad|iPhone|iPod/.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-}
-
-function averageEmbeddings(items: VoiceEmbedding[]): VoiceEmbedding {
-  if (!items.length) throw new Error('No Leo voice embeddings were produced')
-  const first = items[0]
-  const shape = first.shape.slice()
-  const length = first.data.length
-  for (const item of items) {
-    if (item.data.length !== length || item.shape.join(',') !== shape.join(',')) {
-      throw new Error('Leo voice embedding shapes did not match')
-    }
-  }
-  const data = new Float32Array(length)
-  for (const item of items) {
-    for (let i = 0; i < length; i++) data[i] += item.data[i] / items.length
-  }
-  return { data, shape }
 }
 
 function localUrl(path: string): string {
@@ -507,30 +491,21 @@ class PocketService {
         const pcm = await decodeReference(reference, rate)
         if (pcm.length < rate) throw new Error('Leo voice sample is too short')
 
-        let embedding: VoiceEmbedding
-        if (isIOSDevice() && pcm.length > rate * 12) {
-          // WebKit is much more stable when the voice encoder sees ~10-second pieces
-          // instead of one 42-second tensor. Every part of the stored reference still
-          // contributes to Leo: encode each piece, then average the fixed-size embeddings.
-          const segmentCount = Math.max(2, Math.ceil(pcm.length / (rate * 11)))
-          const segmentLength = Math.ceil(pcm.length / segmentCount)
-          const embeddings: VoiceEmbedding[] = []
-          for (let index = 0; index < segmentCount; index++) {
-            const start = index * segmentLength
-            const end = Math.min(pcm.length, start + segmentLength)
-            if (end - start < rate * 2) continue
-            this.onProgressCallback?.(`Preparing Leo voice ${index + 1}/${segmentCount}...`, 99)
-            embeddings.push(await candidate.cloneVoice(pcm.slice(start, end)))
-            await new Promise<void>((resolve) => setTimeout(resolve, 25))
-          }
-          embedding = averageEmbeddings(embeddings)
-        } else {
-          this.onProgressCallback?.('Preparing the full Leo reference...', 99)
-          embedding = await candidate.cloneVoice(pcm)
-        }
+        // Pocket's voice embedding is a temporal sequence. Never average embeddings
+        // from different portions of speech. Use one continuous conditioning clip.
+        // Pocket's official export/server path truncates uploaded references to 30s;
+        // keeping the same limit also avoids the 42s WebKit memory spike.
+        const conditioningSamples = Math.min(pcm.length, Math.floor(rate * CONDITIONING_SECONDS))
+        const conditioningPcm = pcm.slice(0, conditioningSamples)
+        if (conditioningPcm.length < rate) throw new Error('Leo conditioning clip is too short')
+        this.onProgressCallback?.('Preparing Leo from the original continuous reference...', 99)
+        const embedding = await candidate.cloneVoice(conditioningPcm)
 
         await this.saveEmbedding(embedding)
-        log.info('Prepared the full Leo reference', { seconds: pcm.length / rate })
+        log.info('Prepared Leo from one continuous reference', {
+          storedSeconds: pcm.length / rate,
+          conditioningSeconds: conditioningPcm.length / rate,
+        })
 
         if (isIOSDevice()) {
           // Drop the voice-cloning runtime before narration so the large encoder
