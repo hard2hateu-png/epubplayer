@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Trans } from '@lingui/react/macro'
 import { t } from '@lingui/core/macro'
 import { useStorageStats } from './useStorageStats'
+import { PocketVoiceSetupSheet } from './PocketVoiceSetupSheet'
 import { settingsRepository, DEFAULT_SETTINGS, type SettingKey } from '@/services/storage/settingsRepository'
-import { ttsManager, type TTSEngine } from '@/services/tts'
+import { ttsManager, pocketService, type TTSEngine } from '@/services/tts'
 import { PIPER_MODELS } from '@/services/tts/piperService'
 import { SUPERTONIC_VOICES } from '@/services/tts/supertonicService'
 import { SHERPA_VOICES } from '@/services/tts/sherpaService'
@@ -32,6 +33,7 @@ function getTTSEngines() {
   return [
     { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
     { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
+    { id: 'pocket' as TTSEngine, name: t`Pocket TTS (Leo)`, description: t`Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use.` },
     { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
     { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
     { id: 'kitten' as TTSEngine, name: t`Kitten (Light)`, description: t`Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download.` },
@@ -152,6 +154,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [browserVoices, setBrowserVoices] = useState<{ id: string; name: string }[]>([])
+  const [pocketVoiceInstalled, setPocketVoiceInstalled] = useState<boolean | null>(null)
 
   // Load settings on mount
   useEffect(() => {
@@ -159,6 +162,8 @@ export function SettingsPage() {
       setSettings(s)
       setSettingsLoaded(true)
     })
+
+    void pocketService.hasLeoVoiceSample().then(setPocketVoiceInstalled).catch(() => setPocketVoiceInstalled(false))
     
     // Load browser voices
     const loadVoices = () => {
@@ -216,6 +221,9 @@ export function SettingsPage() {
   }
 
   const getVoiceName = (id: string) => {
+    if (settings.ttsEngine === 'pocket') {
+      return 'Leo'
+    }
     if (settings.ttsEngine === 'browser') {
       return browserVoices.find((v) => v.id === id)?.name || t`System Default`
     }
@@ -312,6 +320,17 @@ export function SettingsPage() {
             description={t`Choose speed vs quality`}
             onClick={() => setActiveSheet('ttsEngine')}
           />
+
+          {settings.ttsEngine !== 'pocket' && (
+            <SettingsItem
+              icon={<VolumeIcon className="h-5 w-5" />}
+              label={t`Pocket TTS — Leo`}
+              value={pocketVoiceInstalled === null ? t`Checking…` : pocketVoiceInstalled ? t`Installed` : t`Set up`}
+              description={t`Install or replace the private local Leo voice sample`}
+              onClick={() => setActiveSheet('pocketLeo')}
+            />
+          )}
+
           {/* Voice selection - different for each engine */}
           {settings.ttsEngine === 'browser' && (
             <>
@@ -350,6 +369,23 @@ export function SettingsPage() {
                 label={t`Buffer Ahead`}
                 value={getBufferAheadLabel()}
                 description={t`Keeps generating ahead even while paused`}
+                onClick={() => setActiveSheet('bufferAhead')}
+              />
+            </>
+          )}
+          {settings.ttsEngine === 'pocket' && (
+            <>
+              <SettingsItem
+                icon={<VolumeIcon className="h-5 w-5" />}
+                label={t`Voice`}
+                value="Leo"
+                description={pocketVoiceInstalled ? t`Local custom Pocket TTS voice` : t`Voice sample required`}
+                onClick={() => setActiveSheet('pocketLeo')}
+              />
+              <SettingsItem
+                label={t`Buffer Ahead`}
+                value={getBufferAheadLabel()}
+                description={t`Uses the same generated-audio cache and iPhone safety limit`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -570,6 +606,7 @@ export function SettingsPage() {
               settings.ttsEngine === 'browser' ? 'Web Speech API' :
               settings.ttsEngine === 'piper' ? 'Piper VITS' :
               settings.ttsEngine === 'supertonic' ? 'Supertonic 66M' :
+              settings.ttsEngine === 'pocket' ? 'Pocket TTS — Leo' :
               settings.ttsEngine === 'sherpa' ? 'Sherpa-ONNX' :
               settings.ttsEngine === 'kitten' ? 'KittenTTS Nano 15M' :
               'Kokoro.js 82M'
@@ -584,6 +621,12 @@ export function SettingsPage() {
       </div>
 
       {/* Selection Sheets */}
+      <PocketVoiceSetupSheet
+        isOpen={activeSheet === 'pocketLeo'}
+        onClose={() => setActiveSheet(null)}
+        onInstalledChange={setPocketVoiceInstalled}
+      />
+
       <SelectionSheet
         isOpen={activeSheet === 'language'}
         onClose={() => setActiveSheet(null)}
@@ -605,6 +648,15 @@ export function SettingsPage() {
         value={settings.ttsEngine}
         onChange={async (v) => {
           const engine = v as TTSEngine
+
+          if (engine === 'pocket') {
+            const installed = await pocketService.hasLeoVoiceSample()
+            setPocketVoiceInstalled(installed)
+            if (!installed) {
+              setActiveSheet('pocketLeo')
+              return
+            }
+          }
           
           // IMPORTANT: Set the voice for the new engine FIRST (without triggering reload)
           // so that when reloadTTSSettings runs, it reads the correct voice.
@@ -624,6 +676,23 @@ export function SettingsPage() {
           } else if (engine === 'kitten') {
             await settingsRepository.set('kittenVoice', 'expr-voice-2-m')
             setSettings((prev) => ({ ...prev, kittenVoice: 'expr-voice-2-m' }))
+          } else if (engine === 'pocket') {
+            // Unique cache identity for Leo. Pocket itself always uses the local Leo clone.
+            await settingsRepository.set('voiceId', 'pocket:leo')
+            setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
+          }
+
+          // PlaybackController currently resolves the outgoing engine's voice during a hot-swap.
+          // A one-time page reload when switching to/from Pocket avoids a transient wrong cache key
+          // without changing the stable playback controller used by the existing engines.
+          const switchingToOrFromPocket = engine === 'pocket' || settings.ttsEngine === 'pocket'
+          if (switchingToOrFromPocket) {
+            await settingsRepository.set('ttsEngine', engine)
+            setSettings((prev) => ({ ...prev, ttsEngine: engine }))
+            setActiveSheet(null)
+            ttsManager.destroy()
+            window.location.reload()
+            return
           }
           
           // Now update the engine (which triggers reloadTTSSettings with correct voice)
