@@ -142,22 +142,29 @@ class VoiceboxRemoteService {
     this.destroy()
   }
 
-  private headers(extra?: HeadersInit): Headers {
-    const { accessToken } = this.getConfig()
-    const headers = new Headers(extra)
-    headers.set('X-Voicebox-Token', accessToken)
-    return headers
-  }
-
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
     const { baseUrl, accessToken } = this.getConfig()
     if (!baseUrl || !accessToken) throw new Error('Voicebox Colab server is not connected')
-    return fetch(`${normalizeBaseUrl(baseUrl)}${path}`, {
-      ...init,
-      headers: this.headers(init.headers),
-      cache: 'no-store',
-      credentials: 'omit',
-    })
+
+    // Keep iOS Safari on the EPUB Player origin. Direct authenticated requests
+    // to a Cloudflare Quick Tunnel can fail during CORS/preflight with only the
+    // generic WebKit "Load failed" error. Vercel relays the same request to the
+    // user's temporary Voicebox session instead.
+    const headers = new Headers(init.headers)
+    headers.set('X-Voicebox-Upstream', normalizeBaseUrl(baseUrl))
+    headers.set('X-Voicebox-Token', accessToken)
+
+    try {
+      return await fetch(`/api/voicebox-relay?path=${encodeURIComponent(path)}`, {
+        ...init,
+        headers,
+        cache: 'no-store',
+        credentials: 'same-origin',
+      })
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      throw new Error(`Could not reach the EPUB Player Voicebox relay: ${detail}`)
+    }
   }
 
   private async errorDetail(response: Response): Promise<string> {
