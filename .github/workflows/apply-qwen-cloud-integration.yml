@@ -21,6 +21,11 @@ jobs:
       - name: Apply Qwen integration patch
         run: python .github/scripts/apply_qwen_cloud_integration.py
 
+      - name: Remove unused logger from Qwen client
+        run: |
+          sed -i "/import { createLogger } from '@\\/services\\/logging'/d" src/services/tts/qwenCloudService.ts
+          sed -i "/const log = createLogger('tts')/d" src/services/tts/qwenCloudService.ts
+
       - name: Check JavaScript proxy syntax
         run: node --check api/qwen-cloud.js
 
