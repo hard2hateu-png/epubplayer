@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { pocketService } from '@/services/tts'
+import { pocketService, ttsManager } from '@/services/tts'
+import { settingsRepository } from '@/services/storage/settingsRepository'
 import { useFocusTrap } from '@/ui/accessibility'
 
 export function PocketVoiceSetupSheet({
@@ -12,6 +13,7 @@ export function PocketVoiceSetupSheet({
   onInstalledChange?: (installed: boolean) => void
 }) {
   const [installed, setInstalled] = useState(false)
+  const [active, setActive] = useState(false)
   const [checking, setChecking] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -29,16 +31,20 @@ export function PocketVoiceSetupSheet({
     setMessage(null)
     setError(null)
 
-    pocketService
-      .hasLeoVoiceSample()
-      .then((hasReference) => {
+    Promise.all([
+      pocketService.hasLeoVoiceSample(),
+      settingsRepository.get('ttsEngine'),
+    ])
+      .then(([hasReference, engine]) => {
         if (cancelled) return
         setInstalled(hasReference)
+        setActive(engine === 'pocket')
         onInstalledChange?.(hasReference)
       })
       .catch(() => {
         if (cancelled) return
         setInstalled(false)
+        setActive(false)
         onInstalledChange?.(false)
       })
       .finally(() => {
@@ -51,6 +57,38 @@ export function PocketVoiceSetupSheet({
   }, [isOpen, onInstalledChange])
 
   if (!isOpen) return null
+
+  const activateLeo = async () => {
+    const hasReference = await pocketService.hasLeoVoiceSample()
+    if (!hasReference) {
+      setInstalled(false)
+      onInstalledChange?.(false)
+      throw new Error('Install the Leo reference before using Pocket TTS.')
+    }
+
+    // Pocket has one custom voice. Keep its engine + cache identity in sync so
+    // Settings, playback, and generated-audio caching all agree that Leo is active.
+    await settingsRepository.set('voiceId', 'pocket:leo')
+    await settingsRepository.set('ttsEngine', 'pocket')
+    setActive(true)
+    ttsManager.destroy()
+
+    // The settings page already renders Pocket-specific controls from ttsEngine.
+    // Reload once so Supertonic/Kokoro controls disappear immediately and Voice = Leo.
+    window.location.reload()
+  }
+
+  const handleUseLeo = async () => {
+    setBusy(true)
+    setMessage(null)
+    setError(null)
+    try {
+      await activateLeo()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not activate Pocket TTS — Leo.')
+      setBusy(false)
+    }
+  }
 
   const handleFile = async (file: File | null) => {
     if (!file) return
@@ -66,16 +104,14 @@ export function PocketVoiceSetupSheet({
         'Preparing Leo from the complete reference. The first preparation can take a while; later launches reuse the saved voice fingerprint.'
       )
       await pocketService.initialize()
-      setMessage(
-        'Leo is ready. The saved voice fingerprint will make future starts faster.'
-      )
+      setMessage('Leo is ready. Activating Pocket TTS…')
+      await activateLeo()
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : 'Could not install and prepare the Leo reference.'
       )
-    } finally {
       setBusy(false)
     }
   }
@@ -89,6 +125,16 @@ export function PocketVoiceSetupSheet({
       await pocketService.removeLeoVoiceSample()
       setInstalled(false)
       onInstalledChange?.(false)
+
+      // Never leave the app pointing at Pocket when its only voice was removed.
+      if (active) {
+        await settingsRepository.set('supertonicVoice', 'F1')
+        await settingsRepository.set('ttsEngine', 'supertonic')
+        ttsManager.destroy()
+        window.location.reload()
+        return
+      }
+
       setMessage('Leo voice reference and saved fingerprint were removed from this device.')
     } catch (err) {
       setError(
@@ -153,15 +199,35 @@ export function PocketVoiceSetupSheet({
                     : 'text-sm text-text-muted'
                 }
               >
-                {checking ? 'Checking…' : installed ? 'Installed' : 'Not installed'}
+                {checking ? 'Checking…' : active ? 'Active' : installed ? 'Installed' : 'Not installed'}
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Pocket TTS now uses the complete stored Leo clip—up to 42 seconds—instead
+              Pocket TTS uses the complete stored Leo clip—up to 42 seconds—instead
               of choosing only the loudest 10-second section. The previous app's saved
               reference is recovered automatically when available.
             </p>
           </div>
+
+          {installed && !active && (
+            <button
+              type="button"
+              disabled={busy || checking}
+              onClick={() => void handleUseLeo()}
+              className="pressable min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white disabled:opacity-50"
+            >
+              {busy ? 'Switching to Leo…' : 'Use Leo for TTS'}
+            </button>
+          )}
+
+          {active && (
+            <div className="rounded-xl bg-accent/10 px-4 py-3">
+              <p className="text-sm font-medium text-text-primary">Leo is the active voice</p>
+              <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                TTS Engine is Pocket TTS and the reader voice is Leo.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <p className="text-sm font-medium text-text-primary">
@@ -177,7 +243,7 @@ export function PocketVoiceSetupSheet({
           <label
             className={`block ${busy ? 'pointer-events-none opacity-60' : ''}`}
           >
-            <span className="pressable flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white">
+            <span className={`pressable flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-center font-semibold ${active || installed ? 'bg-surface-2 text-text-primary' : 'bg-accent text-white'}`}>
               {busy
                 ? 'Preparing Leo…'
                 : installed
