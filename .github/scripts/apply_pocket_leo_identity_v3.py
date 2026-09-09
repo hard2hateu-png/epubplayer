@@ -68,3 +68,5 @@ p = Path('src/features/player/TTSBufferManager.ts')
 s = p.read_text()
 s = s.replace("const POCKET_AUDIO_CACHE_VERSION = 'pocket-serial-v2'", "const POCKET_AUDIO_CACHE_VERSION = 'pocket-leo-v3'")
 p.write_text(s)
+
+# trigger
