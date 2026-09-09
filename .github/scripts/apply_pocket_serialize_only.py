@@ -74,3 +74,5 @@ p = Path('src/features/player/TTSBufferManager.ts')
 s = p.read_text()
 s = s.replace("const POCKET_AUDIO_CACHE_VERSION = 'pocket-guard-v1'", "const POCKET_AUDIO_CACHE_VERSION = 'pocket-serial-v2'")
 p.write_text(s)
+
+# Trigger after the workflow is present.
