@@ -215,9 +215,10 @@ class PocketWorkerRuntime {
   }
 
   async cloneVoice(audio: Float32Array, ref: string): Promise<string> {
-    // Transfer a dedicated copy so the caller's working buffer isn't detached.
+    // pocket-tts-js expects a Float32Array in payload.audio. Transfer a dedicated
+    // copy so the caller's buffer stays intact while avoiding another worker copy.
     const copy = audio.slice()
-    const result = await this.request('cloneVoice', { audio: copy.buffer, ref }, [copy.buffer]) as { ref?: string }
+    const result = await this.request('cloneVoice', { audio: copy, ref }, [copy.buffer]) as { ref?: string }
     return result.ref || ref
   }
 

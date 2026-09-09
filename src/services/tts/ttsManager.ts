@@ -15,6 +15,7 @@ import { piperService } from './piperService'
 import { supertonicService } from './supertonicService'
 import { sherpaService } from './sherpaService'
 import { kittenService } from './kittenService'
+import { pocketService } from './pocketService'
 import type {
   TTSEngine,
   TTSEngineInfo,
@@ -62,6 +63,17 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
       generatesBlobs: true,   // Pre-generates WAV blobs
       requiresInit: true,     // Needs model loading
       slowOnCPU: false,       // Fast on both WebGPU and WASM
+    },
+  },
+  pocket: {
+    id: 'pocket',
+    name: 'Pocket TTS (Leo)',
+    description: 'Custom local Leo voice clone. Runs on-device and uses the normal generated-audio cache.',
+    available: true,
+    capabilities: {
+      generatesBlobs: true,
+      requiresInit: true,
+      slowOnCPU: false,
     },
   },
   piper: {
@@ -246,6 +258,11 @@ class TTSManager {
           await kittenService.initialize()
           break
 
+        case 'pocket':
+          this.wireUpService(pocketService, 'pocket')
+          await pocketService.initialize()
+          break
+
         case 'browser':
           // Browser TTS doesn't need initialization
           break
@@ -371,6 +388,17 @@ class TTSManager {
           }
         }
 
+        case 'pocket': {
+          const result = await pocketService.generateChunk(text, chunkIndex)
+          return {
+            requestId: result.requestId,
+            blob: result.blob,
+            duration: result.duration,
+            chunkIndex: result.chunkIndex,
+            text: result.text,
+          }
+        }
+
         default:
           throw new Error(`Unknown TTS engine: ${this.currentEngine}`)
       }
@@ -393,6 +421,8 @@ class TTSManager {
         return sherpaService.splitIntoChunks(text)
       case 'kitten':
         return kittenService.splitIntoChunks(text)
+      case 'pocket':
+        return pocketService.splitIntoChunks(text)
       default:
         return kokoroTTS.splitIntoChunks(text)
     }
@@ -442,6 +472,9 @@ class TTSManager {
       case 'kitten':
         kittenService.cancelAll()
         break
+      case 'pocket':
+        pocketService.cancelAll()
+        break
     }
   }
 
@@ -461,6 +494,9 @@ class TTSManager {
         break
       case 'kitten':
         kittenService.destroy()
+        break
+      case 'pocket':
+        pocketService.destroy()
         break
     }
     this.isInitialized = false
