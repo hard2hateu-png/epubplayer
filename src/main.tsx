@@ -24,9 +24,6 @@ const standalone =
   window.matchMedia?.('(display-mode: standalone)').matches ||
   Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
 
-let swRegistration: ServiceWorkerRegistration | undefined
-let reloadingForServiceWorker = false
-const hadServiceWorkerControllerAtStartup = Boolean(navigator.serviceWorker?.controller)
 
 log.info('App startup', {
   navigationType: navigationEntry?.type ?? 'unknown',
@@ -36,28 +33,10 @@ log.info('App startup', {
   userAgent: navigator.userAgent,
 })
 
-// iOS can keep a Home Screen PWA's old JavaScript alive even after a newer
-// service worker has activated. Reload exactly once when an existing install
-// changes controllers so the page immediately starts using the new app bundle.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hadServiceWorkerControllerAtStartup || reloadingForServiceWorker) return
-    reloadingForServiceWorker = true
-    log.info('New Service Worker activated; reloading app shell')
-    window.location.reload()
-  })
-}
-
 document.addEventListener('visibilitychange', () => {
   log.info('Visibility changed', { state: document.visibilityState })
   if (document.visibilityState === 'hidden') {
     logStore.flushPersistence()
-  } else {
-    // Check promptly when an installed PWA returns to the foreground instead
-    // of waiting for WebKit's normal service-worker update interval.
-    void swRegistration?.update().catch((error) => {
-      log.warn('Service Worker update check failed', { error })
-    })
   }
 })
 
@@ -69,11 +48,7 @@ window.addEventListener('pagehide', (event) => {
 const updateSW = registerSW({
   immediate: true,
   onRegistered(registration) {
-    swRegistration = registration
     log.info('Service Worker registered', { scope: registration?.scope })
-    void registration?.update().catch((error) => {
-      log.warn('Initial Service Worker update check failed', { error })
-    })
   },
   onNeedRefresh() {
     log.info('Service Worker update available; activating now')

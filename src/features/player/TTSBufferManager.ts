@@ -56,6 +56,11 @@ function isIOSDevice(): boolean {
 // memory pressure. A couple minutes of look-ahead is plenty for seamless 1.5x
 // playback without continuously generating a whole chapter in the background.
 const IOS_MAX_BUFFER_CHUNKS = 12
+const IOS_POCKET_MAX_BUFFER_CHUNKS = 2
+
+function getIOSBufferLimit(engine?: TTSEngine): number {
+  return engine === 'pocket' ? IOS_POCKET_MAX_BUFFER_CHUNKS : IOS_MAX_BUFFER_CHUNKS
+}
 
 export class TTSBufferManager {
   private ctx: BufferContext | null = null
@@ -334,7 +339,7 @@ export class TTSBufferManager {
     if (mode === 'chapter') {
       // Desktop can honor full-chapter buffering. On iOS, cap the look-ahead so
       // Supertonic + cached WAV data cannot steadily push WebKit into a reload.
-      const iosLimit = isIOSDevice() ? IOS_MAX_BUFFER_CHUNKS : undefined
+      const iosLimit = isIOSDevice() ? getIOSBufferLimit(this.ctx?.engine) : undefined
       await pushFrom(startSection, startChunk, iosLimit)
 
       if (iosLimit !== undefined && chunks.length >= iosLimit) {
@@ -354,7 +359,7 @@ export class TTSBufferManager {
 
     if (mode === 'book') {
       if (isIOSDevice()) {
-        await pushFrom(startSection, startChunk, IOS_MAX_BUFFER_CHUNKS)
+        await pushFrom(startSection, startChunk, getIOSBufferLimit(this.ctx?.engine))
         return chunks
       }
 
@@ -368,7 +373,7 @@ export class TTSBufferManager {
     // mode === 'minutes'
     // Accumulate until target seconds is reached (heuristic; avoids per-chunk IndexedDB reads).
     const targetSeconds = Math.max(0, minutes) * 60
-    const maxIOSChunks = isIOSDevice() ? IOS_MAX_BUFFER_CHUNKS : Number.POSITIVE_INFINITY
+    const maxIOSChunks = isIOSDevice() ? getIOSBufferLimit(this.ctx?.engine) : Number.POSITIVE_INFINITY
     let acc = 0
 
     const addChunk = (c: ChunkInfo) => {
@@ -498,7 +503,8 @@ export class TTSBufferManager {
 
           // Give iOS a small breather between neural generations so WebKit has
           // time to release temporary inference/audio allocations.
-          await this.waitForWakeOrTimeout(isIOSDevice() ? 40 : 0)
+          const iOSBreather = isIOSDevice() ? (this.ctx?.engine === 'pocket' ? 500 : 40) : 0
+          await this.waitForWakeOrTimeout(iOSBreather)
         } catch (e) {
           if (isAbortError(e)) {
             log.debug('Buffer loop aborted')

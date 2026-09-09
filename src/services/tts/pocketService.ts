@@ -39,6 +39,30 @@ type Bundle = { language: string; sampleRate: number; samplesPerFrame: number; p
 type Metrics = { rtfx?: number; genTime?: number; audioDuration?: number; stopped?: boolean }
 type VoiceEmbedding = { data: Float32Array; shape: number[] }
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+function averageEmbeddings(items: VoiceEmbedding[]): VoiceEmbedding {
+  if (!items.length) throw new Error('No Leo voice embeddings were produced')
+  const first = items[0]
+  const shape = first.shape.slice()
+  const length = first.data.length
+  for (const item of items) {
+    if (item.data.length !== length || item.shape.join(',') !== shape.join(',')) {
+      throw new Error('Leo voice embedding shapes did not match')
+    }
+  }
+  const data = new Float32Array(length)
+  for (const item of items) {
+    for (let i = 0; i < length; i++) data[i] += item.data[i] / items.length
+  }
+  return { data, shape }
+}
+
 function localUrl(path: string): string {
   if (typeof window === 'undefined') return `https://local.invalid${path}`
   return new URL(path, window.location.origin).toString()
@@ -146,7 +170,7 @@ class PocketWorkerRuntime {
       modelBaseUrl: MODEL_BASE,
       ortBaseUrl: ORT_BASE,
       voicesUrl: null,
-      maxThreads: 4,
+      maxThreads: isIOSDevice() ? 1 : 4,
       cache: true,
       cacheName: MODEL_CACHE,
     })
@@ -458,7 +482,8 @@ class PocketService {
     let candidate: PocketWorkerRuntime | null = null
     try {
       const maxChunkChars = await settingsRepository.get('maxChunkChars')
-      this.config = { maxChunkChars: Math.min(MAX_CHUNK_CHARS, Math.max(120, maxChunkChars)) }
+      const deviceMaxChunkChars = isIOSDevice() ? 150 : MAX_CHUNK_CHARS
+      this.config = { maxChunkChars: Math.min(deviceMaxChunkChars, Math.max(120, maxChunkChars)) }
       this.onProgressCallback?.('Loading Pocket TTS...', 0)
 
       const saved = await this.getEmbedding()
@@ -478,12 +503,42 @@ class PocketService {
         const reference = await this.getReference()
         candidate = await this.createRuntime(false)
         const rate = candidate.bundle?.sampleRate || SAMPLE_RATE
-        this.onProgressCallback?.('Preparing the full Leo reference...', 99)
         const pcm = await decodeReference(reference, rate)
         if (pcm.length < rate) throw new Error('Leo voice sample is too short')
-        const embedding = await candidate.cloneVoice(pcm)
+
+        let embedding: VoiceEmbedding
+        if (isIOSDevice() && pcm.length > rate * 12) {
+          // WebKit is much more stable when the voice encoder sees ~10-second pieces
+          // instead of one 42-second tensor. Every part of the stored reference still
+          // contributes to Leo: encode each piece, then average the fixed-size embeddings.
+          const segmentCount = Math.max(2, Math.ceil(pcm.length / (rate * 11)))
+          const segmentLength = Math.ceil(pcm.length / segmentCount)
+          const embeddings: VoiceEmbedding[] = []
+          for (let index = 0; index < segmentCount; index++) {
+            const start = index * segmentLength
+            const end = Math.min(pcm.length, start + segmentLength)
+            if (end - start < rate * 2) continue
+            this.onProgressCallback?.(`Preparing Leo voice ${index + 1}/${segmentCount}...`, 99)
+            embeddings.push(await candidate.cloneVoice(pcm.slice(start, end)))
+            await new Promise<void>((resolve) => setTimeout(resolve, 25))
+          }
+          embedding = averageEmbeddings(embeddings)
+        } else {
+          this.onProgressCallback?.('Preparing the full Leo reference...', 99)
+          embedding = await candidate.cloneVoice(pcm)
+        }
+
         await this.saveEmbedding(embedding)
         log.info('Prepared the full Leo reference', { seconds: pcm.length / rate })
+
+        if (isIOSDevice()) {
+          // Drop the voice-cloning runtime before narration so the large encoder
+          // is not resident alongside the synthesis model during playback.
+          candidate.destroy()
+          candidate = await this.createRuntime(true)
+          this.onProgressCallback?.('Loading saved Leo voice...', 99)
+          await candidate.loadVoiceEmbedding(embedding)
+        }
       }
 
       this.runtime = candidate
