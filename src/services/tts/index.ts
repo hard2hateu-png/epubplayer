@@ -33,7 +33,3 @@ export type { KittenConfig, KittenGeneratedAudio, KittenVoiceId } from './kitten
 // Pocket TTS custom voice service
 export { pocketService, POCKET_VOICE_NAME, POCKET_VOICE_ID } from './pocketService'
 export type { PocketConfig, PocketGeneratedAudio } from './pocketService'
-
-// Qwen3-TTS cloud custom voice service
-export { qwenCloudService, QWEN_VOICE_NAME, QWEN_VOICE_ID } from './qwenCloudService'
-export type { QwenCloudGeneratedAudio } from './qwenCloudService'
