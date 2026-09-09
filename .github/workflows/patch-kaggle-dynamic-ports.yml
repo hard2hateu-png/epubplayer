@@ -24,7 +24,7 @@ jobs:
 
           path = Path('tools/Voicebox_Free_Kaggle.ipynb')
           nb = json.loads(path.read_text())
-          code = r'''# Start Voicebox + secure proxy + HTTPS tunnel, then KEEP THIS CELL RUNNING.
+          code = r"""# Start Voicebox + secure proxy + HTTPS tunnel, then KEEP THIS CELL RUNNING.
 import os, subprocess, time, pathlib, secrets, re, urllib.request, html, requests, socket
 from IPython.display import display, HTML
 from urllib.parse import urlencode
@@ -167,7 +167,7 @@ while True:
     if heartbeat % 6 == 0:
         print(time.strftime('%H:%M:%S'), 'Voicebox server alive' if ok else 'Voicebox health check failed', flush=True)
     time.sleep(10)
-'''
+"""
           nb['cells'][-1]['source'] = code.splitlines(keepends=True)
           path.write_text(json.dumps(nb, separators=(',', ':')))
           PY
