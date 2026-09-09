@@ -191,7 +191,7 @@ function makeChunkKey(ctx: BufferContext, chunk: ChunkInfo): ChunkKey {
 assert old in s
 s = s.replace(old, new, 1)
 count = s.count('      this.ctx.modelConfig,')
-assert count == 3, count
+assert count == 4, count
 s = s.replace('      this.ctx.modelConfig,', '      cacheModelConfig(this.ctx),')
 assert 'const IOS_POCKET_MAX_BUFFER_CHUNKS = 2' in s
 s = s.replace('const IOS_POCKET_MAX_BUFFER_CHUNKS = 2', 'const IOS_POCKET_MAX_BUFFER_CHUNKS = 3', 1)
