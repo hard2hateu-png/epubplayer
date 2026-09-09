@@ -30,10 +30,15 @@ type BufferContext = {
 }
 
 type ChunkKey = string
+const POCKET_AUDIO_CACHE_VERSION = 'pocket-guard-v1'
+
+function cacheModelConfig(ctx: BufferContext): string {
+  return ctx.engine === 'pocket' ? `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}` : ctx.modelConfig
+}
 
 function makeChunkKey(ctx: BufferContext, chunk: ChunkInfo): ChunkKey {
-  // Include engine in the key to avoid conflicts between Kokoro and Piper cached audio
-  return `${ctx.bookId}:${chunk.sectionIndex}:${chunk.chunkIndex}:${ctx.voiceId}:${ctx.modelConfig}:${ctx.engine}:${chunk.textHash}`
+  // Version Pocket audio independently so old bad WAVs are never replayed.
+  return `${ctx.bookId}:${chunk.sectionIndex}:${chunk.chunkIndex}:${ctx.voiceId}:${cacheModelConfig(ctx)}:${ctx.engine}:${chunk.textHash}`
 }
 
 function isAbortError(e: unknown): boolean {
@@ -211,7 +216,7 @@ export class TTSBufferManager {
       chunk.sectionIndex,
       chunk.chunkIndex,
       this.ctx.voiceId,
-      this.ctx.modelConfig,
+      cacheModelConfig(this.ctx),
       chunk.textHash
     )
     
@@ -253,7 +258,7 @@ export class TTSBufferManager {
         chunk.sectionIndex,
         chunk.chunkIndex,
         this.ctx.voiceId,
-        this.ctx.modelConfig,
+        cacheModelConfig(this.ctx),
         chunk.textHash,
         audio.blob,
         audio.duration
@@ -469,7 +474,7 @@ export class TTSBufferManager {
               c.sectionIndex,
               c.chunkIndex,
               this.ctx.voiceId,
-              this.ctx.modelConfig,
+              cacheModelConfig(this.ctx),
               c.textHash
             )
 
@@ -556,7 +561,7 @@ export class TTSBufferManager {
           sectionIndex,
           i,
           this.ctx.voiceId,
-          this.ctx.modelConfig,
+          cacheModelConfig(this.ctx),
           chunk.textHash
         )
         if (exists) this.knownCached.add(key)
