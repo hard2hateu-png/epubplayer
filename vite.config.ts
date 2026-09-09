@@ -16,14 +16,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [
-        'favicon.svg',
-        'apple-touch-icon-v2.png',
-        'app-icon-192.png',
-        'app-icon-512.png',
-        'og-image.png',
-        'voices/leo-reference-full.m4a',
-      ],
+      includeAssets: ['favicon.svg', 'apple-touch-icon-v2.png', 'app-icon-192.png', 'app-icon-512.png', 'og-image.png'],
       manifest: {
         name: 'EPUB Player',
         short_name: 'EPUBPlayer',
@@ -89,7 +82,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,m4a,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
