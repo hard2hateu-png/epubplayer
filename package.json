@@ -8,7 +8,7 @@
     "dev": "vite",
     "dev:host": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "dev:usb": "adb reverse tcp:5173 tcp:5173 && vite",
-    "build": "tsc -b && vite build",
+    "build": "lingui extract && lingui compile && tsc -b && vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
