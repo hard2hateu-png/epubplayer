@@ -97,6 +97,7 @@ class VoiceboxRemoteService {
   private isReady = false
   private isLoading = false
   private initPromise: Promise<void> | null = null
+  private initGeneration = 0
   private requestCounter = 0
   private cancelEpoch = 0
   private activeGenerationIds = new Set<string>()
@@ -110,9 +111,10 @@ class VoiceboxRemoteService {
     const normalized = normalizeBaseUrl(baseUrl)
     const token = accessToken.trim()
     if (!token) throw new Error('Voicebox access token is required')
+    // Cancel work against the old session before swapping credentials.
+    this.destroy()
     localStorage.setItem(BASE_URL_KEY, normalized)
     localStorage.setItem(ACCESS_TOKEN_KEY, token)
-    this.destroy()
   }
 
   getConfig(): { baseUrl: string; accessToken: string } {
@@ -129,12 +131,12 @@ class VoiceboxRemoteService {
   }
 
   clearConfig(): void {
+    this.destroy()
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(BASE_URL_KEY)
       localStorage.removeItem(ACCESS_TOKEN_KEY)
       localStorage.removeItem(PROFILE_ID_KEY)
     }
-    this.destroy()
   }
 
   async resetLeoProfile(): Promise<void> {
@@ -154,16 +156,30 @@ class VoiceboxRemoteService {
     headers.set('X-Voicebox-Upstream', normalizeBaseUrl(baseUrl))
     headers.set('X-Voicebox-Token', accessToken)
 
+    const timeoutMs = path === '/transcribe' || path.includes('/samples') ? 90_000 : 45_000
+    const controller = new AbortController()
+    const upstreamSignal = init.signal
+    const abortFromCaller = () => controller.abort()
+    if (upstreamSignal) upstreamSignal.addEventListener('abort', abortFromCaller, { once: true })
+    const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
     try {
       return await fetch(`/api/voicebox-relay?path=${encodeURIComponent(path)}`, {
         ...init,
         headers,
         cache: 'no-store',
         credentials: 'same-origin',
+        signal: controller.signal,
       })
     } catch (error) {
+      if (controller.signal.aborted && !upstreamSignal?.aborted) {
+        throw new Error(`Voicebox request timed out after ${Math.round(timeoutMs / 1000)} seconds. Re-pair the current Kaggle session and try again.`)
+      }
       const detail = error instanceof Error ? error.message : String(error)
       throw new Error(`Could not reach the EPUB Player Voicebox relay: ${detail}`)
+    } finally {
+      clearTimeout(timeout)
+      upstreamSignal?.removeEventListener('abort', abortFromCaller)
     }
   }
 
@@ -291,29 +307,34 @@ class VoiceboxRemoteService {
   async initialize(): Promise<void> {
     if (this.isReady) return
     if (this.isLoading && this.initPromise) return this.initPromise
+    const generation = this.initGeneration
     this.isLoading = true
-    this.initPromise = this.doInitialize()
+    this.initPromise = this.doInitialize(generation)
     try {
       await this.initPromise
     } finally {
-      this.initPromise = null
+      if (generation === this.initGeneration) this.initPromise = null
     }
   }
 
-  private async doInitialize(): Promise<void> {
+  private async doInitialize(generation: number): Promise<void> {
     try {
       this.onProgressCallback?.('Connecting to Voicebox…', 5)
       await this.testConnection()
+      if (generation !== this.initGeneration) return
       await this.ensureLeoProfile()
+      if (generation !== this.initGeneration) return
       this.isReady = true
       this.isLoading = false
       this.onProgressCallback?.('Voicebox — Leo ready', 100)
       this.onReadyCallback?.()
     } catch (error) {
-      this.isReady = false
-      this.isLoading = false
-      const message = error instanceof Error ? error.message : String(error)
-      this.onErrorCallback?.(message)
+      if (generation === this.initGeneration) {
+        this.isReady = false
+        this.isLoading = false
+        const message = error instanceof Error ? error.message : String(error)
+        this.onErrorCallback?.(message)
+      }
       throw error
     }
   }
@@ -404,6 +425,7 @@ class VoiceboxRemoteService {
   }
 
   destroy(): void {
+    this.initGeneration += 1
     this.cancelAll()
     this.isReady = false
     this.isLoading = false

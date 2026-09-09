@@ -34,7 +34,7 @@ function getTTSEngines() {
   return [
     { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
     { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
-    { id: 'voicebox' as TTSEngine, name: t`Voicebox + Qwen3-TTS (Leo)`, description: t`Free/open-source Leo clone using a remote GPU such as a free Google Colab session.` },
+    { id: 'voicebox' as TTSEngine, name: t`Voicebox + Qwen3-TTS (Leo)`, description: t`Free/open-source Leo clone using a remote GPU such as a free Kaggle session.` },
     { id: 'pocket' as TTSEngine, name: t`Pocket TTS (Leo)`, description: t`Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use.` },
     { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
     { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
@@ -166,6 +166,10 @@ export function SettingsPage() {
     if (!voiceboxUrl || !voiceboxToken) return
     try {
       voiceboxRemoteService.configure(voiceboxUrl, voiceboxToken)
+      ttsManager.destroy()
+      void playbackController.reloadTTSSettings().catch((e) => {
+        console.warn('[Settings] Failed to apply new Voicebox pairing:', e)
+      })
       setActiveSheet('voiceboxLeo')
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
     } catch {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { pocketService, ttsManager, voiceboxRemoteService } from '@/services/tts'
 import { settingsRepository } from '@/services/storage/settingsRepository'
+import { playbackController } from '@/features/player/PlaybackController'
 import { useFocusTrap } from '@/ui/accessibility'
 
 const KAGGLE_URL = 'https://www.kaggle.com/notebooks/welcome?src=https://github.com/hard2hateu-png/epubplayer/blob/main/tools/Voicebox_Free_Kaggle.ipynb'
@@ -65,13 +66,13 @@ export function VoiceboxRemoteSetupSheet({
     try {
       voiceboxRemoteService.configure(baseUrl, accessToken)
       const status = await voiceboxRemoteService.testConnection()
-      setMessage(`Connected (${status}). Preparing Leo…`)
-      await voiceboxRemoteService.initialize()
       await settingsRepository.set('voiceId', 'voicebox:leo')
       await settingsRepository.set('ttsEngine', 'voicebox')
-      setActive(true)
       ttsManager.destroy()
-      window.location.reload()
+      await playbackController.reloadTTSSettings()
+      setActive(true)
+      setMessage(`Connected (${status}). Press Play to prepare Leo and start Voicebox.`)
+      setBusy(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not connect to Voicebox.')
       setBusy(false)
@@ -179,7 +180,7 @@ export function VoiceboxRemoteSetupSheet({
             onClick={() => void connectAndActivate()}
             className="pressable min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white disabled:opacity-50"
           >
-            {busy ? 'Preparing Voicebox Leo…' : active ? 'Reconnect Voicebox Leo' : 'Use Voicebox Leo for TTS'}
+            {busy ? 'Connecting Voicebox…' : active ? 'Reconnect Voicebox Leo' : 'Use Voicebox Leo for TTS'}
           </button>
 
           {(baseUrl || accessToken) && (
