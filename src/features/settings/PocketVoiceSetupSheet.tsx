@@ -28,21 +28,27 @@ export function PocketVoiceSetupSheet({
     setChecking(true)
     setMessage(null)
     setError(null)
+
     pocketService
       .hasLeoVoiceSample()
-      .then((value) => {
-        if (!cancelled) setInstalled(value)
+      .then((hasReference) => {
+        if (cancelled) return
+        setInstalled(hasReference)
+        onInstalledChange?.(hasReference)
       })
       .catch(() => {
-        if (!cancelled) setInstalled(false)
+        if (cancelled) return
+        setInstalled(false)
+        onInstalledChange?.(false)
       })
       .finally(() => {
         if (!cancelled) setChecking(false)
       })
+
     return () => {
       cancelled = true
     }
-  }, [isOpen])
+  }, [isOpen, onInstalledChange])
 
   if (!isOpen) return null
 
@@ -51,13 +57,24 @@ export function PocketVoiceSetupSheet({
     setBusy(true)
     setMessage(null)
     setError(null)
+
     try {
       await pocketService.installLeoVoiceSample(file)
       setInstalled(true)
       onInstalledChange?.(true)
-      setMessage('Leo is installed on this device. You can now choose Pocket TTS (Leo) as the TTS engine.')
+      setMessage(
+        'Preparing Leo from the complete reference. The first preparation can take a while; later launches reuse the saved voice fingerprint.'
+      )
+      await pocketService.initialize()
+      setMessage(
+        'Leo is ready. The saved voice fingerprint will make future starts faster.'
+      )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not install the Leo voice sample.')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not install and prepare the Leo reference.'
+      )
     } finally {
       setBusy(false)
     }
@@ -67,13 +84,18 @@ export function PocketVoiceSetupSheet({
     setBusy(true)
     setMessage(null)
     setError(null)
+
     try {
       await pocketService.removeLeoVoiceSample()
       setInstalled(false)
       onInstalledChange?.(false)
-      setMessage('Leo voice sample removed from this device.')
+      setMessage('Leo voice reference and saved fingerprint were removed from this device.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not remove the Leo voice sample.')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Could not remove the Leo voice reference.'
+      )
     } finally {
       setBusy(false)
     }
@@ -100,11 +122,14 @@ export function PocketVoiceSetupSheet({
 
         <div className="flex items-start justify-between gap-4 border-b border-border-muted px-5 pb-4 md:pt-5">
           <div>
-            <h3 id="pocket-leo-setup-title" className="text-lg font-semibold text-text-primary">
+            <h3
+              id="pocket-leo-setup-title"
+              className="text-lg font-semibold text-text-primary"
+            >
               Pocket TTS — Leo
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Custom voice sample stored only on this device.
+              Private custom voice stored only on this device.
             </p>
           </div>
           <button
@@ -120,19 +145,44 @@ export function PocketVoiceSetupSheet({
         <div className="space-y-4 px-5 py-5">
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-text-primary">Leo voice sample</span>
-              <span className={installed ? 'text-sm text-accent' : 'text-sm text-text-muted'}>
+              <span className="font-medium text-text-primary">Leo reference</span>
+              <span
+                className={
+                  installed
+                    ? 'text-sm text-accent'
+                    : 'text-sm text-text-muted'
+                }
+              >
                 {checking ? 'Checking…' : installed ? 'Installed' : 'Not installed'}
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Use the prepared 10-second Leo WAV for the cleanest clone. The reference stays in local browser storage and is not uploaded to this app's GitHub repository.
+              Pocket TTS now uses the complete stored Leo clip—up to 42 seconds—instead
+              of choosing only the loudest 10-second section. The previous app's saved
+              reference is recovered automatically when available.
             </p>
           </div>
 
-          <label className={`block ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+          <div className="rounded-xl bg-surface-2 px-4 py-3">
+            <p className="text-sm font-medium text-text-primary">
+              Faster after the first preparation
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-text-muted">
+              The first run creates a compact Leo voice fingerprint. It stays on this
+              device, so later launches skip re-analyzing the full audio and avoid
+              loading the extra voice-encoder model.
+            </p>
+          </div>
+
+          <label
+            className={`block ${busy ? 'pointer-events-none opacity-60' : ''}`}
+          >
             <span className="pressable flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white">
-              {busy ? 'Working…' : installed ? 'Replace Leo sample' : 'Install Leo sample'}
+              {busy
+                ? 'Preparing Leo…'
+                : installed
+                  ? 'Replace Leo reference'
+                  : 'Install Leo reference'}
             </span>
             <input
               type="file"
@@ -154,7 +204,7 @@ export function PocketVoiceSetupSheet({
               onClick={() => void handleRemove()}
               className="pressable min-h-11 w-full rounded-xl bg-surface-2 px-4 py-3 text-sm font-medium text-error disabled:opacity-50"
             >
-              Remove Leo sample
+              Remove Leo reference
             </button>
           )}
 
@@ -171,7 +221,9 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            The first Pocket TTS use downloads and caches its model files, so the first start will be slower. Generated narration then uses the same audio-blob cache and normal playback controls as the other AI engines.
+            Pocket TTS still downloads its on-device model files the first time.
+            The reference, model files, and prepared fingerprint remain in browser
+            storage for later use.
           </p>
         </div>
       </div>
