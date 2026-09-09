@@ -1,20 +1,18 @@
 /** Qwen3-TTS cloud voice clone for Leo via the app's same-origin Vercel proxy. */
-import { createLogger } from '@/services/logging'
 import { splitTextIntoChunks } from './textChunking'
 
-const log = createLogger('tts')
 
 const TOKEN_KEY = 'epubplayer.replicateApiToken'
 const QWEN_CACHE = 'epub-player-qwen-cloud-v1'
-const REFERENCE_DATA_PATH = '/__epubplayer/qwen/leo-reference-18s-v1'
+const REFERENCE_DATA_PATH = '/__epubplayer/qwen/leo-reference-12s-v1'
 const REFERENCE_TEXT_PATH = '/__epubplayer/qwen/leo-reference-text-v1'
 const POCKET_VOICE_CACHE = 'epub-player-pocket-voices-v2'
 const POCKET_REFERENCE_PATH = '/__epubplayer/pocket/voices/leo-reference-v2'
 const LEGACY_VOICE_CACHE = 'epub-player-pocket-voices-v1'
 const LEGACY_REFERENCE_PATH = '/__epubplayer/pocket/voices/leo'
 const TARGET_RATE = 16_000
-const REFERENCE_SECONDS = 18
-const MAX_CHUNK_CHARS = 420
+const REFERENCE_SECONDS = 12
+const MAX_CHUNK_CHARS = 600
 
 export const QWEN_VOICE_ID = 'qwen:leo'
 export const QWEN_VOICE_NAME = 'Leo'

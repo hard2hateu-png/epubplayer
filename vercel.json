@@ -29,6 +29,10 @@
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/qwen-cloud.js": {
+      "maxDuration": 60
+    }
+  }
 }
-

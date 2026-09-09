@@ -164,7 +164,7 @@ export function QwenCloudSetupSheet({
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Qwen uses one continuous 18-second speech-dense section from the Leo audio already saved in the reader. The original audio is never committed to GitHub.
+              Qwen uses one continuous 12-second speech-dense section from the Leo audio already saved in the reader. The original audio is never committed to GitHub.
             </p>
           </div>
 
