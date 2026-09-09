@@ -14,9 +14,9 @@ const VOICE_CACHE = 'epub-player-pocket-voices-v2'
 const LEGACY_VOICE_CACHE = 'epub-player-pocket-voices-v1'
 const LEGACY_REFERENCE_PATH = '/__epubplayer/pocket/voices/leo'
 const REFERENCE_PATH = '/__epubplayer/pocket/voices/leo-reference-v2'
-const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v2-full'
+const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v3-sequence'
 const VOICE_REF = 'custom:leo'
-const EMBEDDING_MAGIC = 'LEOEMB02'
+const EMBEDDING_MAGIC = 'LEOEMB03'
 const SAMPLE_RATE = 24_000
 const REFERENCE_SECONDS = 42.65
 const MAX_CHUNK_CHARS = 220
@@ -46,21 +46,32 @@ function isIOSDevice(): boolean {
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 }
 
-function averageEmbeddings(items: VoiceEmbedding[]): VoiceEmbedding {
+function concatenateEmbeddings(items: VoiceEmbedding[]): VoiceEmbedding {
   if (!items.length) throw new Error('No Leo voice embeddings were produced')
   const first = items[0]
-  const shape = first.shape.slice()
-  const length = first.data.length
+  if (first.shape.length !== 3 || first.shape[0] !== 1) {
+    throw new Error('Unexpected Leo voice embedding shape')
+  }
+  const featureDim = first.shape[2]
+  let totalFrames = 0
+  let totalValues = 0
   for (const item of items) {
-    if (item.data.length !== length || item.shape.join(',') !== shape.join(',')) {
-      throw new Error('Leo voice embedding shapes did not match')
+    if (item.shape.length !== 3 || item.shape[0] !== 1 || item.shape[2] !== featureDim) {
+      throw new Error('Leo voice embedding feature shapes did not match')
     }
+    if (item.data.length !== item.shape[1] * featureDim) {
+      throw new Error('Leo voice embedding length did not match its shape')
+    }
+    totalFrames += item.shape[1]
+    totalValues += item.data.length
   }
-  const data = new Float32Array(length)
+  const data = new Float32Array(totalValues)
+  let offset = 0
   for (const item of items) {
-    for (let i = 0; i < length; i++) data[i] += item.data[i] / items.length
+    data.set(item.data, offset)
+    offset += item.data.length
   }
-  return { data, shape }
+  return { data, shape: [1, totalFrames, featureDim] }
 }
 
 function localUrl(path: string): string {
@@ -92,6 +103,51 @@ function patchWorker(source: string, tokenizerUrl: string, binaryUrl: string): s
   let result = source
     .replace('"./tokenizer.js"', JSON.stringify(tokenizerUrl))
     .replace('"./binary.js"', JSON.stringify(binaryUrl))
+    .replace('const TEMPERATURE = 0.7;', 'const TEMPERATURE = 0.3;')
+    .replace('const CHUNK_GAP_SEC = 0.25;', 'const CHUNK_GAP_SEC = 0.12;')
+
+  // Match newer Pocket stability behavior: split long sentences at clause
+  // punctuation before falling back to raw token slicing.
+  const tokenSplitOriginal = `function splitTokenIdsIntoChunks(tokenIds, maxTokens) {
+    const chunks = [];
+    for (let i = 0; i < tokenIds.length; i += maxTokens) {
+        const chunkText = tokenizer.decodeIds(tokenIds.slice(i, i + maxTokens)).trim();
+        if (chunkText) chunks.push(chunkText);
+    }
+    return chunks;
+}`
+  const tokenSplitPatched = `${tokenSplitOriginal}
+
+function splitLongSentenceAtClauses(sentenceText, maxTokens) {
+    const parts = sentenceText.match(/[^,;:—–]+[,;:—–]?/g) || [sentenceText];
+    const chunks = [];
+    let current = "";
+    for (const rawPart of parts) {
+        const part = rawPart.trim();
+        if (!part) continue;
+        const combined = current ? current + " " + part : part;
+        if (tokenizer.encodeIds(combined).length <= maxTokens) {
+            current = combined;
+            continue;
+        }
+        if (current) {
+            chunks.push(current.trim());
+            current = "";
+        }
+        const partIds = tokenizer.encodeIds(part);
+        if (partIds.length <= maxTokens) current = part;
+        else chunks.push(...splitTokenIdsIntoChunks(partIds, maxTokens));
+    }
+    if (current) chunks.push(current.trim());
+    return chunks;
+}`
+  if (!result.includes(tokenSplitOriginal)) throw new Error('Pocket worker token split patch no longer matches')
+  result = result.replace(tokenSplitOriginal, tokenSplitPatched)
+
+  const longSentenceOriginal = `for (const splitChunk of splitTokenIdsIntoChunks(sentenceTokenIds, maxTokenPerChunk)) {`
+  const longSentencePatched = `for (const splitChunk of splitLongSentenceAtClauses(sentenceText, maxTokenPerChunk)) {`
+  if (!result.includes(longSentenceOriginal)) throw new Error('Pocket worker long-sentence patch no longer matches')
+  result = result.replace(longSentenceOriginal, longSentencePatched)
 
   const cloneOriginal = `async function cloneVoice(audioData, ref) {
     const emb = await encodeVoiceAudio(audioData);
@@ -368,6 +424,7 @@ class PocketService {
   private config: PocketConfig | null = null
   private requestCounter = 0
   private cancelEpoch = 0
+  private generationTail: Promise<void> = Promise.resolve()
   private onAudioCallback?: AudioCallback
   private onProgressCallback?: ProgressCallback
   private onErrorCallback?: ErrorCallback
@@ -482,8 +539,7 @@ class PocketService {
     let candidate: PocketWorkerRuntime | null = null
     try {
       const maxChunkChars = await settingsRepository.get('maxChunkChars')
-      const deviceMaxChunkChars = isIOSDevice() ? 150 : MAX_CHUNK_CHARS
-      this.config = { maxChunkChars: Math.min(deviceMaxChunkChars, Math.max(120, maxChunkChars)) }
+      this.config = { maxChunkChars: Math.min(MAX_CHUNK_CHARS, Math.max(120, maxChunkChars)) }
       this.onProgressCallback?.('Loading Pocket TTS...', 0)
 
       const saved = await this.getEmbedding()
@@ -522,7 +578,7 @@ class PocketService {
             embeddings.push(await candidate.cloneVoice(pcm.slice(start, end)))
             await new Promise<void>((resolve) => setTimeout(resolve, 25))
           }
-          embedding = averageEmbeddings(embeddings)
+          embedding = concatenateEmbeddings(embeddings)
         } else {
           this.onProgressCallback?.('Preparing the full Leo reference...', 99)
           embedding = await candidate.cloneVoice(pcm)
@@ -559,6 +615,15 @@ class PocketService {
   }
 
   async generateChunk(text: string, chunkIndex: number): Promise<PocketGeneratedAudio> {
+    const run = this.generationTail.then(
+      () => this.generateChunkSerial(text, chunkIndex),
+      () => this.generateChunkSerial(text, chunkIndex),
+    )
+    this.generationTail = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  private async generateChunkSerial(text: string, chunkIndex: number): Promise<PocketGeneratedAudio> {
     await this.initialize()
     const runtime = this.runtime
     if (!runtime || !this.isReady) throw new Error('Pocket TTS is not initialized')

@@ -30,10 +30,15 @@ type BufferContext = {
 }
 
 type ChunkKey = string
+const POCKET_AUDIO_CACHE_VERSION = 'pocket-quality-v3'
+
+function cacheModelConfig(ctx: BufferContext): string {
+  return ctx.engine === 'pocket' ? `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}` : ctx.modelConfig
+}
 
 function makeChunkKey(ctx: BufferContext, chunk: ChunkInfo): ChunkKey {
-  // Include engine in the key to avoid conflicts between Kokoro and Piper cached audio
-  return `${ctx.bookId}:${chunk.sectionIndex}:${chunk.chunkIndex}:${ctx.voiceId}:${ctx.modelConfig}:${ctx.engine}:${chunk.textHash}`
+  // Include engine + Pocket synthesis version so previously glitched audio is never reused.
+  return `${ctx.bookId}:${chunk.sectionIndex}:${chunk.chunkIndex}:${ctx.voiceId}:${cacheModelConfig(ctx)}:${ctx.engine}:${chunk.textHash}`
 }
 
 function isAbortError(e: unknown): boolean {
@@ -56,7 +61,7 @@ function isIOSDevice(): boolean {
 // memory pressure. A couple minutes of look-ahead is plenty for seamless 1.5x
 // playback without continuously generating a whole chapter in the background.
 const IOS_MAX_BUFFER_CHUNKS = 12
-const IOS_POCKET_MAX_BUFFER_CHUNKS = 2
+const IOS_POCKET_MAX_BUFFER_CHUNKS = 3
 
 function getIOSBufferLimit(engine?: TTSEngine): number {
   return engine === 'pocket' ? IOS_POCKET_MAX_BUFFER_CHUNKS : IOS_MAX_BUFFER_CHUNKS
@@ -211,7 +216,7 @@ export class TTSBufferManager {
       chunk.sectionIndex,
       chunk.chunkIndex,
       this.ctx.voiceId,
-      this.ctx.modelConfig,
+      cacheModelConfig(this.ctx),
       chunk.textHash
     )
     
@@ -253,7 +258,7 @@ export class TTSBufferManager {
         chunk.sectionIndex,
         chunk.chunkIndex,
         this.ctx.voiceId,
-        this.ctx.modelConfig,
+        cacheModelConfig(this.ctx),
         chunk.textHash,
         audio.blob,
         audio.duration
@@ -469,7 +474,7 @@ export class TTSBufferManager {
               c.sectionIndex,
               c.chunkIndex,
               this.ctx.voiceId,
-              this.ctx.modelConfig,
+              cacheModelConfig(this.ctx),
               c.textHash
             )
 
@@ -503,7 +508,7 @@ export class TTSBufferManager {
 
           // Give iOS a small breather between neural generations so WebKit has
           // time to release temporary inference/audio allocations.
-          const iOSBreather = isIOSDevice() ? (this.ctx?.engine === 'pocket' ? 500 : 40) : 0
+          const iOSBreather = isIOSDevice() ? (this.ctx?.engine === 'pocket' ? 150 : 40) : 0
           await this.waitForWakeOrTimeout(iOSBreather)
         } catch (e) {
           if (isAbortError(e)) {
@@ -556,7 +561,7 @@ export class TTSBufferManager {
           sectionIndex,
           i,
           this.ctx.voiceId,
-          this.ctx.modelConfig,
+          cacheModelConfig(this.ctx),
           chunk.textHash
         )
         if (exists) this.knownCached.add(key)
