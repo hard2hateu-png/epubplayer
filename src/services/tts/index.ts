@@ -29,3 +29,7 @@ export type { SherpaConfig, SherpaGeneratedAudio, SherpaVoiceId } from './sherpa
 // KittenTTS service
 export { kittenService, KITTEN_VOICES } from './kittenService'
 export type { KittenConfig, KittenGeneratedAudio, KittenVoiceId } from './kittenService'
+
+// Pocket TTS custom voice service
+export { pocketService, POCKET_VOICE_NAME, POCKET_VOICE_ID } from './pocketService'
+export type { PocketConfig, PocketGeneratedAudio } from './pocketService'
