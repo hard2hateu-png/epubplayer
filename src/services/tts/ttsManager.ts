@@ -152,6 +152,7 @@ class TTSManager {
   private isInitialized = false
   private isInitializing = false
   private initPromise: Promise<void> | null = null
+  private initGeneration = 0
 
   // Callbacks
   private onAudioCallback?: AudioCallback
@@ -223,14 +224,16 @@ class TTSManager {
       return this.initPromise
     }
 
+    const generation = this.initGeneration
     this.isInitializing = true
-    this.initPromise = this.doInitialize()
+    this.initPromise = this.doInitialize(generation)
     return this.initPromise
   }
 
-  private async doInitialize(): Promise<void> {
+  private async doInitialize(generation: number): Promise<void> {
     try {
       const engine = await settingsRepository.get('ttsEngine')
+      if (generation !== this.initGeneration) return
       this.currentEngine = engine
 
       log.info('Initializing engine', { engine })
@@ -285,10 +288,16 @@ class TTSManager {
           break
       }
 
+      if (generation !== this.initGeneration) {
+        log.debug('Ignoring stale TTS initialization completion', { engine })
+        return
+      }
       this.markReady()
     } catch (error) {
-      this.isInitializing = false
-      this.initPromise = null
+      if (generation === this.initGeneration) {
+        this.isInitializing = false
+        this.initPromise = null
+      }
       throw error
     }
   }
@@ -535,7 +544,10 @@ class TTSManager {
         voiceboxRemoteService.destroy()
         break
     }
+    this.initGeneration += 1
     this.isInitialized = false
+    this.isInitializing = false
+    this.initPromise = null
   }
 
   async setEngine(engine: TTSEngine): Promise<void> {

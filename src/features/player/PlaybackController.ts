@@ -237,11 +237,16 @@ class PlaybackController {
           (/iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
 
-        if (!deferPocketOnIOS && capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
+        const deferVoiceboxUntilPlay = this.currentEngine === 'voicebox'
+        const deferTTSUntilPlay = deferPocketOnIOS || deferVoiceboxUntilPlay
+
+        if (!deferTTSUntilPlay && capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
           log.debug('Pre-initializing TTS engine')
           ttsManager.initialize().catch((err) => {
             log.error('TTS pre-initialization failed', err)
           })
+        } else if (deferVoiceboxUntilPlay) {
+          log.info('Deferring Voicebox initialization until Play')
         } else if (deferPocketOnIOS) {
           log.info('Deferring Pocket TTS initialization until Play on iOS')
         }
@@ -722,7 +727,7 @@ class PlaybackController {
     // Re-read settings from repository
     const settings = await settingsRepository.getAll()
     const newEngine = settings.ttsEngine as TTSEngine
-    const newVoiceId = this.getVoiceForEngine(settings)
+    const newVoiceId = this.getVoiceForEngine(settings, newEngine)
     const newModelConfig = settings.modelConfig
 
     const engineChanged = newEngine !== this.currentEngine
@@ -750,8 +755,9 @@ class PlaybackController {
     // Restart buffer manager for blob-based engines
     const capabilities = ttsManager.getEngineCapabilities(newEngine)
     if (capabilities.generatesBlobs && bookId) {
-      // Pre-initialize the TTS engine
-      if (capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
+      // Remote Voicebox sessions initialize only when the user presses Play.
+      const deferVoiceboxUntilPlay = newEngine === 'voicebox'
+      if (!deferVoiceboxUntilPlay && capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
         log.debug('Pre-initializing new TTS engine')
         ttsManager.initialize().catch((err) => {
           log.error('TTS pre-initialization failed after settings change', err)
@@ -922,8 +928,8 @@ class PlaybackController {
     supertonicVoice: string
     sherpaVoice: string
     kittenVoice: string
-  }): string {
-    switch (this.currentEngine) {
+  }, engine: TTSEngine = this.currentEngine): string {
+    switch (engine) {
       case 'supertonic':
         return settings.supertonicVoice
       case 'sherpa':
