@@ -30,7 +30,7 @@ type BufferContext = {
 }
 
 type ChunkKey = string
-const POCKET_AUDIO_CACHE_VERSION = 'pocket-serial-v2'
+const POCKET_AUDIO_CACHE_VERSION = 'pocket-leo-v3'
 
 function cacheModelConfig(ctx: BufferContext): string {
   return ctx.engine === 'pocket' ? `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}` : ctx.modelConfig
