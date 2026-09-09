@@ -31,9 +31,12 @@ type BufferContext = {
 
 type ChunkKey = string
 const POCKET_AUDIO_CACHE_VERSION = 'pocket-leo-v4-12s'
+const VOICEBOX_AUDIO_CACHE_VERSION = 'voicebox-leo-qwen17-v1'
 
 function cacheModelConfig(ctx: BufferContext): string {
-  return ctx.engine === 'pocket' ? `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}` : ctx.modelConfig
+  if (ctx.engine === 'pocket') return `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}`
+  if (ctx.engine === 'voicebox') return `${ctx.modelConfig}:${VOICEBOX_AUDIO_CACHE_VERSION}`
+  return ctx.modelConfig
 }
 
 function makeChunkKey(ctx: BufferContext, chunk: ChunkInfo): ChunkKey {

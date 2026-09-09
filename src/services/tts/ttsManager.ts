@@ -16,6 +16,7 @@ import { supertonicService } from './supertonicService'
 import { sherpaService } from './sherpaService'
 import { kittenService } from './kittenService'
 import { pocketService } from './pocketService'
+import { voiceboxRemoteService } from './voiceboxRemoteService'
 import type {
   TTSEngine,
   TTSEngineInfo,
@@ -63,6 +64,17 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
       generatesBlobs: true,   // Pre-generates WAV blobs
       requiresInit: true,     // Needs model loading
       slowOnCPU: false,       // Fast on both WebGPU and WASM
+    },
+  },
+  voicebox: {
+    id: 'voicebox',
+    name: 'Voicebox (Leo)',
+    description: 'Free/open-source Voicebox + Qwen3-TTS on a remote GPU such as Google Colab.',
+    available: true,
+    capabilities: {
+      generatesBlobs: true,
+      requiresInit: true,
+      slowOnCPU: false,
     },
   },
   pocket: {
@@ -263,6 +275,11 @@ class TTSManager {
           await pocketService.initialize()
           break
 
+        case 'voicebox':
+          this.wireUpService(voiceboxRemoteService, 'voicebox')
+          await voiceboxRemoteService.initialize()
+          break
+
         case 'browser':
           // Browser TTS doesn't need initialization
           break
@@ -399,6 +416,17 @@ class TTSManager {
           }
         }
 
+        case 'voicebox': {
+          const result = await voiceboxRemoteService.generateChunk(text, chunkIndex)
+          return {
+            requestId: result.requestId,
+            blob: result.blob,
+            duration: result.duration,
+            chunkIndex: result.chunkIndex,
+            text: result.text,
+          }
+        }
+
         default:
           throw new Error(`Unknown TTS engine: ${this.currentEngine}`)
       }
@@ -423,6 +451,8 @@ class TTSManager {
         return kittenService.splitIntoChunks(text)
       case 'pocket':
         return pocketService.splitIntoChunks(text)
+      case 'voicebox':
+        return voiceboxRemoteService.splitIntoChunks(text)
       default:
         return kokoroTTS.splitIntoChunks(text)
     }
@@ -475,6 +505,9 @@ class TTSManager {
       case 'pocket':
         pocketService.cancelAll()
         break
+      case 'voicebox':
+        voiceboxRemoteService.cancelAll()
+        break
     }
   }
 
@@ -497,6 +530,9 @@ class TTSManager {
         break
       case 'pocket':
         pocketService.destroy()
+        break
+      case 'voicebox':
+        voiceboxRemoteService.destroy()
         break
     }
     this.isInitialized = false

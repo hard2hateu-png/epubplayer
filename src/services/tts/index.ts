@@ -33,3 +33,7 @@ export type { KittenConfig, KittenGeneratedAudio, KittenVoiceId } from './kitten
 // Pocket TTS custom voice service
 export { pocketService, POCKET_VOICE_NAME, POCKET_VOICE_ID } from './pocketService'
 export type { PocketConfig, PocketGeneratedAudio } from './pocketService'
+
+// Voicebox remote custom voice service
+export { voiceboxRemoteService, VOICEBOX_VOICE_NAME, VOICEBOX_VOICE_ID } from './voiceboxRemoteService'
+export type { VoiceboxGeneratedAudio } from './voiceboxRemoteService'
