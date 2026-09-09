@@ -20,8 +20,6 @@ const EMBEDDING_MAGIC = 'LEOEMB02'
 const SAMPLE_RATE = 24_000
 const REFERENCE_SECONDS = 42.65
 const MAX_CHUNK_CHARS = 220
-const WARMUP_TEXT = 'The room was quiet, and the evening felt calm.'
-const MAX_GENERATION_ATTEMPTS = 2
 
 export interface PocketConfig { maxChunkChars: number }
 export interface PocketGeneratedAudio {
@@ -341,46 +339,6 @@ function deserializeEmbedding(buffer: ArrayBuffer): VoiceEmbedding {
   return { data, shape }
 }
 
-function getGeneratedAudioIssue(chunks: Float32Array[], sampleRate: number, text: string): string | null {
-  const totalSamples = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-  if (!totalSamples || sampleRate <= 0) return 'no audio samples'
-
-  let sumSquares = 0
-  let peak = 0
-  let finiteSamples = 0
-  for (const chunk of chunks) {
-    for (const sample of chunk) {
-      if (!Number.isFinite(sample)) return 'non-finite audio samples'
-      const abs = Math.abs(sample)
-      peak = Math.max(peak, abs)
-      sumSquares += sample * sample
-      finiteSamples++
-    }
-  }
-  if (!finiteSamples) return 'no finite audio samples'
-
-  const rms = Math.sqrt(sumSquares / finiteSamples)
-  const duration = totalSamples / sampleRate
-  const words = text.trim().split(/\s+/).filter(Boolean).length
-
-  // Hyper-rushed / prematurely terminated output is one of the Pocket failures
-  // we have observed. Keep this threshold intentionally loose so normal fast
-  // narration is not rejected.
-  if (words >= 8) {
-    const minimumDuration = Math.max(1.25, words / 5.5)
-    if (duration < minimumDuration) {
-      return `audio too short (${duration.toFixed(2)}s for ${words} words)`
-    }
-  }
-
-  // Only reject near-silent output. We do not try to classify timbre here.
-  if (peak < 0.015 || rms < 0.002) {
-    return `audio unusually quiet (peak ${peak.toFixed(4)}, rms ${rms.toFixed(4)})`
-  }
-
-  return null
-}
-
 function chunksToWav(chunks: Float32Array[], sampleRate: number): Blob {
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
   const buffer = new ArrayBuffer(44 + total * 2)
@@ -411,7 +369,6 @@ class PocketService {
   private requestCounter = 0
   private cancelEpoch = 0
   private generationTail: Promise<void> = Promise.resolve()
-  private hasWarmedUp = false
   private onAudioCallback?: AudioCallback
   private onProgressCallback?: ProgressCallback
   private onErrorCallback?: ErrorCallback
@@ -586,7 +543,6 @@ class PocketService {
       }
 
       this.runtime = candidate
-      this.hasWarmedUp = false
       this.isReady = true
       this.isLoading = false
       this.onProgressCallback?.('Pocket TTS ready', 100)
@@ -604,9 +560,10 @@ class PocketService {
   }
 
   async generateChunk(text: string, chunkIndex: number): Promise<PocketGeneratedAudio> {
-    // The underlying Pocket browser worker exposes one streaming audio callback.
-    // Serialize foreground playback and background buffering so one generation
-    // can never steal another generation's callback.
+    // Pocket's browser worker exposes a single streaming audio callback.
+    // Serialize every generation so foreground playback and background buffering
+    // cannot steal each other's callback. Do not warm up, retry, or otherwise
+    // run hidden generations: those can alter Pocket's subsequent voice state.
     const run = this.generationTail.then(
       () => this.generateChunkSerial(text, chunkIndex),
       () => this.generateChunkSerial(text, chunkIndex),
@@ -615,61 +572,28 @@ class PocketService {
     return run
   }
 
-  private async ensureWarmup(runtime: PocketWorkerRuntime, epoch: number): Promise<void> {
-    if (this.hasWarmedUp) return
-    this.onProgressCallback?.('Warming up Leo...', 100)
-    const warmupChunks: Float32Array[] = []
-    await runtime.generate(WARMUP_TEXT, (audio) => warmupChunks.push(audio.slice()))
-    if (epoch !== this.cancelEpoch) throw new DOMException('Generation cancelled', 'AbortError')
-    this.hasWarmedUp = true
-    const rate = runtime.bundle?.sampleRate || SAMPLE_RATE
-    const samples = warmupChunks.reduce((sum, chunk) => sum + chunk.length, 0)
-    log.info('Pocket TTS warm-up complete', { duration: samples / rate })
-  }
-
   private async generateChunkSerial(text: string, chunkIndex: number): Promise<PocketGeneratedAudio> {
     await this.initialize()
     const runtime = this.runtime
     if (!runtime || !this.isReady) throw new Error('Pocket TTS is not initialized')
     const epoch = this.cancelEpoch
-
+    const requestId = `pocket_${++this.requestCounter}_${Date.now()}`
+    const chunks: Float32Array[] = []
     try {
-      await this.ensureWarmup(runtime, epoch)
-
-      for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-        const requestId = `pocket_${++this.requestCounter}_${Date.now()}`
-        const chunks: Float32Array[] = []
-        const metrics = await runtime.generate(text, (audio) => chunks.push(audio.slice()))
-        if (epoch !== this.cancelEpoch) throw new DOMException('Generation cancelled', 'AbortError')
-        if (!chunks.length) throw new Error('Pocket TTS returned no audio')
-
-        const rate = runtime.bundle?.sampleRate || SAMPLE_RATE
-        const issue = getGeneratedAudioIssue(chunks, rate, text)
-        if (issue) {
-          log.warn('Pocket TTS produced suspicious audio', { requestId, attempt, issue })
-          if (attempt < MAX_GENERATION_ATTEMPTS) {
-            this.onProgressCallback?.('Retrying an unstable Leo chunk...', 100)
-            await new Promise<void>((resolve) => setTimeout(resolve, 60))
-            continue
-          }
-          throw new Error(`Pocket TTS produced unstable audio twice: ${issue}`)
-        }
-
-        const samples = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
-        const result: PocketGeneratedAudio = {
-          requestId, blob: chunksToWav(chunks, rate), duration: samples / rate, chunkIndex, text,
-        }
-        log.debug('Pocket TTS generated audio', {
-          requestId, attempt, rtfx: metrics.rtfx, genTime: metrics.genTime,
-        })
-        this.onAudioCallback?.(result)
-        return result
+      const metrics = await runtime.generate(text, (audio) => chunks.push(audio.slice()))
+      if (epoch !== this.cancelEpoch) throw new DOMException('Generation cancelled', 'AbortError')
+      if (!chunks.length) throw new Error('Pocket TTS returned no audio')
+      const rate = runtime.bundle?.sampleRate || SAMPLE_RATE
+      const samples = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+      const result: PocketGeneratedAudio = {
+        requestId, blob: chunksToWav(chunks, rate), duration: samples / rate, chunkIndex, text,
       }
-
-      throw new Error('Pocket TTS generation failed')
+      log.debug('Pocket TTS generated audio', { requestId, rtfx: metrics.rtfx, genTime: metrics.genTime })
+      this.onAudioCallback?.(result)
+      return result
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        this.onErrorCallback?.(error instanceof Error ? error.message : String(error))
+        this.onErrorCallback?.(error instanceof Error ? error.message : String(error), requestId)
       }
       throw error
     }
@@ -683,7 +607,6 @@ class PocketService {
     this.cancelEpoch++
     this.runtime?.destroy()
     this.runtime = null
-    this.hasWarmedUp = false
     this.isReady = false
     this.isLoading = false
     this.initPromise = null
