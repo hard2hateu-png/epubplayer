@@ -1,0 +1,18 @@
+name: Test live Qwen production endpoint
+
+on:
+  push:
+    branches:
+      - experiment/qwen-cloud-leo
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check live Qwen proxy
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --retry 4 --retry-all-errors --retry-delay 2 https://epubplayer-eta.vercel.app/api/qwen-cloud)"
+          echo "$body"
+          echo "$body" | grep -F '"ok":true'
+          echo "$body" | grep -F 'Qwen3-TTS cloud proxy'
