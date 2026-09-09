@@ -231,11 +231,19 @@ class PlaybackController {
       if (capabilities.generatesBlobs) {
         // Start TTS initialization immediately (non-blocking)
         // The buffer manager will wait for it to be ready before generating
-        if (capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
+        const deferPocketOnIOS =
+          this.currentEngine === 'pocket' &&
+          typeof navigator !== 'undefined' &&
+          (/iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))
+
+        if (!deferPocketOnIOS && capabilities.requiresInit && !ttsManager.getIsReady() && !ttsManager.getIsLoading()) {
           log.debug('Pre-initializing TTS engine')
           ttsManager.initialize().catch((err) => {
             log.error('TTS pre-initialization failed', err)
           })
+        } else if (deferPocketOnIOS) {
+          log.info('Deferring Pocket TTS initialization until Play on iOS')
         }
 
         // Start background buffering
