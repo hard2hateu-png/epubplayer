@@ -476,7 +476,7 @@ async function decodeLatents(
   }
 }
 
-async function runProbe(): Promise<void> {
+async function runProbe(generationOnly = false): Promise<void> {
   if (!isWebGPUSupported()) {
     throw new Error('WebGPU is not available in this Safari session. The LiteRT safety test will not fall back to the large CPU model.')
   }
@@ -518,8 +518,35 @@ async function runProbe(): Promise<void> {
     generationMs = generated.generationMs
     await gpuState.device.queue.onSubmittedWorkDone()
   } finally {
+    const device = gpuState?.device
     destroyGpuState(gpuState)
     flow.delete()
+    if (generationOnly) {
+      try {
+        device?.destroy?.()
+      } catch {
+        // The worker is terminated immediately after the latent handoff.
+      }
+    }
+  }
+
+  if (generationOnly) {
+    const flatLatents = new Float32Array(latents.length * LATENT_WIDTH)
+    for (let i = 0; i < latents.length; i++) {
+      flatLatents.set(latents[i], i * LATENT_WIDTH)
+    }
+    status('Pocket language model released; handing off decoder…')
+    scope.postMessage(
+      {
+        type: 'latent-result',
+        latents: flatLatents,
+        latentFrames: latents.length,
+        generationMs,
+        text: SAMPLE_TEXT,
+      },
+      [flatLatents.buffer],
+    )
+    return
   }
 
   status('Pocket language model released; decoding audio…')
@@ -546,8 +573,8 @@ async function runProbe(): Promise<void> {
 }
 
 self.onmessage = (event: MessageEvent<{ type?: string }>) => {
-  if (event.data?.type !== 'run') return
-  void runProbe()
+  if (event.data?.type !== 'run' && event.data?.type !== 'generate-only') return
+  void runProbe(event.data.type === 'generate-only')
     .catch((error) => {
       scope.postMessage({
         type: 'error',
