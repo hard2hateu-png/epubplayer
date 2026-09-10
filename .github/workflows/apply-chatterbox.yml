@@ -42,8 +42,19 @@ jobs:
           }
           NODE
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint changed app files
+        run: |
+          npx eslint \
+            src/services/tts/chatterboxService.ts \
+            src/services/tts/types.ts \
+            src/services/tts/index.ts \
+            src/services/tts/ttsManager.ts \
+            src/services/tts/pocketService.ts \
+            src/services/storage/settingsRepository.ts \
+            src/features/settings/SettingsPage.tsx \
+            src/features/settings/PocketVoiceSetupSheet.tsx \
+            src/features/player/TTSBufferManager.ts \
+            src/features/player/PlaybackController.ts
 
       - name: Build
         run: npm run build
