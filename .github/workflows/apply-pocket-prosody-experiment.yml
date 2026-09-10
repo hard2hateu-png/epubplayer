@@ -1,0 +1,45 @@
+name: Apply Pocket prosody experiment
+
+on:
+  push:
+    branches:
+      - experiment-pocket-prosody
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: experiment-pocket-prosody
+          fetch-depth: 0
+
+      - name: Apply isolated Pocket prosody patch
+        run: python .github/scripts/apply_pocket_prosody_experiment.py
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Test Pocket prosody helper
+        run: |
+          npm ci
+          npm test -- src/services/tts/pocketProsody.test.ts
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/tts/pocketService.ts
+          if git diff --cached --quiet; then
+            echo "No patch changes needed"
+            exit 0
+          fi
+          git commit -m "Test natural Pocket tail pauses"
+          git push origin HEAD:experiment-pocket-prosody
