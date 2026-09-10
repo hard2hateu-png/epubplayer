@@ -1,0 +1,61 @@
+name: Build Chatterbox test for Hatchable
+
+on:
+  push:
+    branches:
+      - feat/chatterbox-turbo
+
+permissions:
+  contents: write
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build production app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Adapt generated browser module URLs for Hatchable
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in Path('dist').rglob('*'):
+              if path.is_file() and path.suffix in {'.js', '.mjs'}:
+                  text = path.read_text()
+                  patched = text.replace('import.meta.url', 'globalThis.location.href')
+                  if patched != text:
+                      path.write_text(patched)
+          PY
+
+      - name: Publish isolated static build
+        run: |
+          rm -rf /tmp/chatterbox-dist
+          mkdir -p /tmp/chatterbox-dist
+          cp -R dist/. /tmp/chatterbox-dist/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout --orphan hatchable-chatterbox-dist
+          git rm -rf .
+          cp -R /tmp/chatterbox-dist/. .
+          git add -A
+          git commit -m 'Build Chatterbox reader test for Hatchable'
+          git push --force origin HEAD:hatchable-chatterbox-dist
+
+      - name: Remove temporary workflow from source branch
+        run: |
+          git checkout -B feat/chatterbox-turbo origin/feat/chatterbox-turbo
+          rm -f .github/workflows/chatterbox-hatchable-test.yml
+          git add -A
+          git commit -m 'Remove temporary Hatchable test workflow'
+          git push origin HEAD:feat/chatterbox-turbo
