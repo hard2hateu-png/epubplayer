@@ -1,0 +1,9 @@
+[[secret]]
+name = "HF_TOKEN"
+required = true
+description = "Hugging Face read token used server-side for authenticated ZeroGPU calls. Never exposed to the browser."
+
+[[secret]]
+name = "CHATTERBOX_SPACE_URL"
+required = true
+description = "HTTPS URL for the user's Chatterbox Turbo ZeroGPU Space, for example https://lunalit-epub-chatterbox.hf.space"
