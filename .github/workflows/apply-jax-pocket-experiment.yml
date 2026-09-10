@@ -1,0 +1,52 @@
+name: Apply JAX Pocket experiment
+
+on:
+  push:
+    branches:
+      - experiment-pocket-jaxjs
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[jax-pocket-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: experiment-pocket-jaxjs
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Vendor pinned JAX Pocket source
+        run: python .github/scripts/apply_jax_pocket_vendor.py
+
+      - name: Install JAX browser dependencies
+        run: npm install --save-exact @jax-js/jax@0.1.24 @jax-js/loaders@0.1.3
+
+      - name: Verify no native-server dependency
+        run: |
+          ! grep -R "pocket-native\|railway.app\|/voice/install" src/services/tts/pocketService.ts src/services/tts/jaxPocket/worker.ts
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit experiment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src/services/tts/pocketService.ts src/services/tts/jaxPocket src/features/settings/SettingsPage.tsx
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "Build local JAX-JS Pocket experiment [jax-pocket-applied]"
+          git push origin HEAD:experiment-pocket-jaxjs
