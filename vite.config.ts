@@ -86,6 +86,7 @@ export default defineConfig({
         navigateFallbackDenylist: [
           /^\/nano-test(?:\.html)?$/,
           /^\/chatterbox-full-test(?:\.html)?$/,
+          /^\/chatterbox-staged-test(?:\.html)?$/,
         ],
         runtimeCaching: [
           {
