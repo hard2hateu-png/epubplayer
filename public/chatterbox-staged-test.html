@@ -4,32 +4,34 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d12" />
-<title>Low-memory Chatterbox iPhone Test</title>
+<title>Full Chatterbox — 4-thread WASM</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
-*{box-sizing:border-box} body{margin:0;background:#0b0d12;color:#f5f6f7;min-height:100vh}
+*{box-sizing:border-box}body{margin:0;background:#0b0d12;color:#f5f6f7;min-height:100vh}
 main{width:min(760px,100%);margin:auto;padding:max(22px,env(safe-area-inset-top)) 18px max(40px,env(safe-area-inset-bottom))}
-h1{font-size:27px;margin:0 0 8px} h2{font-size:17px;margin:0 0 10px} p,small{color:#aeb5c1;line-height:1.45}
+h1{font-size:27px;margin:0 0 8px}h2{font-size:17px;margin:0 0 10px}p,small{color:#aeb5c1;line-height:1.45}
 .card{background:#151922;border:1px solid #282e3a;border-radius:18px;padding:16px;margin:14px 0}
 .notice{background:#211b12;border-left:3px solid #765a25;padding:12px 14px;border-radius:10px;color:#e4d8bc;line-height:1.4;font-size:14px}
+.good{background:#122019;border-left-color:#387757;color:#ccebd8}
 label{display:block;color:#aeb4bf;font-size:13px;margin:10px 0 6px}
 textarea,input[type=file]{width:100%;background:#0f1218;color:#f4f5f7;border:1px solid #303746;border-radius:12px;padding:11px 12px;font:inherit}
 textarea{min-height:110px;resize:vertical;line-height:1.4}
 button{width:100%;border:0;border-radius:13px;padding:13px 14px;font-size:16px;font-weight:650;background:#e8eaf0;color:#111318;margin-top:10px}
-button.secondary{background:#252b36;color:#f3f4f6} button.danger{background:#322127;color:#ffdfe7} button:disabled{opacity:.4}
+button.secondary{background:#252b36;color:#f3f4f6}button.danger{background:#322127;color:#ffdfe7}button:disabled{opacity:.4}
 .status{display:flex;justify-content:space-between;gap:12px}.muted{color:#929aa7;font-size:13px}.ok{color:#a9e9c2}.warn{color:#f1d28d}.error{color:#ff9cae}
 audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
 .settings{display:grid;gap:6px;font-size:14px}.settings div{display:flex;justify-content:space-between;gap:10px}
-#log{background:#090b0f;border:1px solid #242a35;border-radius:12px;padding:10px;height:210px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
+#log{background:#090b0f;border:1px solid #242a35;border-radius:12px;padding:10px;height:230px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 .count{text-align:right;color:#8f97a4;font-size:12px;margin-top:5px}
 </style>
 </head>
 <body>
 <main>
-  <div class="step">Isolated diagnostic · staged memory test</div>
-  <h1>Full Chatterbox, low-memory mode</h1>
-  <p>This loads the full Chatterbox components one stage at a time instead of keeping the entire ~1.5 GB model resident in Safari.</p>
-  <div class="notice">Your previous full-model test crashed around 60–80% of loading. This version is specifically designed around that failure: speech encoder → release; token models → release; decoder → release.</div>
+  <div class="step">FULL ORIGINAL CHATTERBOX · STAGED MEMORY · 4-THREAD WASM</div>
+  <h1>Full Chatterbox — 4-thread WASM</h1>
+  <div id="isolation" class="notice"><strong>Checking thread support…</strong></div>
+  <p>This is the same local Full Chatterbox configuration that produced the closest Leo result. The experiment changes only the WASM CPU execution from 1 thread to up to 4 threads.</p>
+  <div class="notice">Quality baseline is frozen: full Leo clip for identity · 10s decoder prompt · 6s LM prompt · temperature 0.9 · exaggeration 0.5 · CFG 0 · repetition 1.2 · Min-P 0.05.</div>
 
   <section class="card">
     <h2>Current status</h2>
@@ -47,10 +49,10 @@ audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transfo
 
   <section class="card">
     <div class="step">2 · Runtime</div>
-    <h2>Initialize low-memory mode</h2>
-    <button id="init">Initialize runtime</button>
+    <h2>Initialize 4-thread WASM</h2>
+    <button id="init">Initialize 4-thread runtime</button>
     <div id="init-result" class="muted"></div>
-    <small>This step loads only JavaScript + the tokenizer, not the large model weights.</small>
+    <small>The button will refuse to continue if Safari/Vercel did not establish cross-origin isolation and SharedArrayBuffer.</small>
   </section>
 
   <section class="card">
@@ -62,18 +64,19 @@ audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transfo
 
   <section class="card">
     <div class="step">4 · Generate</div>
-    <h2>Generate one ≤200-character sample</h2>
+    <h2>Generate the same ≤200-character sample</h2>
     <div class="settings">
+      <div><span>WASM threads</span><strong id="thread-label">4 requested</strong></div>
       <div><span>Temperature</span><strong>0.9</strong></div>
       <div><span>Exaggeration</span><strong>0.5</strong></div>
-      <div><span>CFG/Pace</span><strong>0.5 · custom staged CFG</strong></div>
+      <div><span>CFG/Pace</span><strong>0 · single batch</strong></div>
       <div><span>Repetition penalty</span><strong>1.2</strong></div>
       <div><span>Min-P</span><strong>0.05</strong></div>
     </div>
     <label for="text">Text</label>
     <textarea id="text" maxlength="200"></textarea>
     <div id="count" class="count">0/200</div>
-    <button id="generate" disabled>Generate with staged full Chatterbox</button>
+    <button id="generate" disabled>Generate with Full Chatterbox · 4 threads</button>
     <div id="generate-result" class="muted"></div>
     <div id="out-wrap" hidden><audio id="out" controls preload="metadata"></audio></div>
   </section>
@@ -86,39 +89,34 @@ audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transfo
   </section>
 </main>
 <script type="module">
-const SAMPLE_RATE=24000, MAX_REF_SECONDS=45, MAX_TEXT=200
+const SAMPLE_RATE=24000,MAX_REF_SECONDS=45,MAX_TEXT=200,REQUESTED_THREADS=4
 const TEST_TEXT='He looked out the window for a moment, then smiled to himself. The rain had finally stopped, and the street below was beginning to shine.'
 const $=id=>document.getElementById(id)
 const state={worker:null,file:null,refUrl:null,outUrl:null,initialized:false,prepared:false,phase:null,started:null,init:null,prepare:null,generation:null,errors:[]}
-
 function log(message,kind=''){const row=document.createElement('div');row.className=kind;row.textContent=`${new Date().toLocaleTimeString()}  ${message}`;$('log').append(row);$('log').scrollTop=$('log').scrollHeight}
 function status(title,detail=''){$('status-title').textContent=title;$('status-detail').textContent=detail}
 function setBusy(v){$('init').disabled=v||state.initialized;$('prepare').disabled=v||!state.initialized||!state.file;$('generate').disabled=v||!state.prepared}
-function mark(phase){state.phase=phase;if(phase)localStorage.setItem('stagedChatterboxPhase',JSON.stringify({phase,at:Date.now()}));else localStorage.removeItem('stagedChatterboxPhase')}
+function mark(phase){state.phase=phase;if(phase)localStorage.setItem('chatterboxWasm4Phase',JSON.stringify({phase,at:Date.now()}));else localStorage.removeItem('chatterboxWasm4Phase')}
 function start(phase){state.started=performance.now();mark(phase);const s=state.started;const tick=()=>{if(state.started!==s)return;$('elapsed').textContent=`${((performance.now()-s)/1000).toFixed(1)}s`;requestAnimationFrame(tick)};tick()}
 function stop(){state.started=null;mark(null)}
-function workerUrl(){const u=new URL('/chatterbox-staged-worker.js',location.origin);u.searchParams.set('v','20260910-staged-a');const p=new URLSearchParams(location.search).get('_preview');if(p)u.searchParams.set('_preview',p);return u.href}
-function worker(){if(state.worker)return state.worker;const w=new Worker(workerUrl(),{type:'module',name:'chatterbox-staged'});w.onmessage=e=>onWorker(e.data);w.onerror=e=>fail(new Error(e.message||'Worker crashed'));state.worker=w;return w}
+function workerUrl(){const u=new URL('/chatterbox-staged-worker.js',location.origin);u.searchParams.set('v','20260910-full-wasm4-a');return u.href}
+function worker(){if(state.worker)return state.worker;const w=new Worker(workerUrl(),{type:'module',name:'chatterbox-full-wasm4'});w.onmessage=e=>onWorker(e.data);w.onerror=e=>fail(new Error(e.message||'Worker crashed'));state.worker=w;return w}
 const pending=new Map();let rpcId=0
 function rpc(type,payload={},transfer=[]){return new Promise((resolve,reject)=>{const id=++rpcId;pending.set(id,{resolve,reject});worker().postMessage({id,type,payload},transfer)})}
 function onWorker(msg){if(msg.type==='progress'){status(msg.status||'Working',msg.detail||'');log(`${msg.status||'Working'}${msg.detail?` — ${msg.detail}`:''}`);return}const p=pending.get(msg.id);if(!p)return;pending.delete(msg.id);if(msg.type==='error')p.reject(new Error(msg.error||'Worker error'));else p.resolve(msg.result)}
 function fail(err){const m=err?.message||String(err);state.errors.push({phase:state.phase,message:m});status('Stopped',m);log(m,'error');state.started=null;setBusy(false)}
-
 async function decodeReference(file){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw new Error('Web Audio unavailable');const ctx=new AC();try{const decoded=await ctx.decodeAudioData(await file.arrayBuffer());const dur=Math.min(decoded.duration,MAX_REF_SECONDS);const off=new OfflineAudioContext(1,Math.round(dur*SAMPLE_RATE),SAMPLE_RATE);const src=off.createBufferSource();src.buffer=decoded;src.connect(off.destination);src.start(0,0,dur);const rendered=await off.startRendering();return Float32Array.from(rendered.getChannelData(0))}finally{await ctx.close().catch(()=>{})}}
 function wavBlob(samples,sr){const b=new ArrayBuffer(44+samples.length*2),v=new DataView(b);const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};w(0,'RIFF');v.setUint32(4,36+samples.length*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,samples.length*2,true);let o=44;for(const x of samples){const y=Math.max(-1,Math.min(1,x));v.setInt16(o,y<0?y*0x8000:y*0x7fff,true);o+=2}return new Blob([b],{type:'audio/wav'})}
-
-$('text').value=TEST_TEXT;$('count').textContent=`${TEST_TEXT.length}/${MAX_TEXT}`
-$('text').oninput=()=>{$('count').textContent=`${$('text').value.length}/${MAX_TEXT}`}
+function showIsolation(){const isolated=window.crossOriginIsolated===true,sab=typeof SharedArrayBuffer!=='undefined',hc=navigator.hardwareConcurrency||null;const el=$('isolation');if(isolated&&sab){el.className='notice good';el.innerHTML=`<strong>4-thread prerequisites present.</strong><br>crossOriginIsolated = true · SharedArrayBuffer = yes · hardwareConcurrency = ${hc??'unknown'}`;log(`Thread prerequisites OK: isolated=${isolated}, SAB=${sab}, hardwareConcurrency=${hc}.`,'ok')}else{el.className='notice';el.innerHTML=`<strong>4-thread mode is not available on this response.</strong><br>crossOriginIsolated = ${isolated} · SharedArrayBuffer = ${sab?'yes':'no'} · hardwareConcurrency = ${hc??'unknown'}`;log(`Thread prerequisites missing: isolated=${isolated}, SAB=${sab}, hardwareConcurrency=${hc}.`,'error')}}
+$('text').value=TEST_TEXT;$('count').textContent=`${TEST_TEXT.length}/${MAX_TEXT}`;$('text').oninput=()=>{$('count').textContent=`${$('text').value.length}/${MAX_TEXT}`}
 $('file').onchange=()=>{const f=$('file').files?.[0];if(!f)return;state.file=f;if(state.refUrl)URL.revokeObjectURL(state.refUrl);state.refUrl=URL.createObjectURL(f);$('ref-audio').src=state.refUrl;$('ref-wrap').hidden=false;state.prepared=false;setBusy(false);log(`Selected ${f.name}; audio remains local.`)}
-
-$('init').onclick=async()=>{setBusy(true);start('runtime-init');status('Initializing','No large weights yet');try{state.init=await rpc('init');state.initialized=true;$('init-result').textContent=`Runtime ready in ${((state.init.initMs||0)/1000).toFixed(1)}s.`;$('init-result').className='ok';status('Runtime ready','Next: prepare Leo');log('Runtime initialized.','ok');stop();setBusy(false)}catch(e){fail(e)}}
-$('prepare').onclick=async()=>{setBusy(true);start('speech-encoder');try{status('Decoding Leo',`Up to ${MAX_REF_SECONDS}s at 24 kHz`);const samples=await decodeReference(state.file);log(`Decoded ${(samples.length/SAMPLE_RATE).toFixed(1)}s Leo reference.`);state.prepare=await rpc('prepare',{samples},[samples.buffer]);state.prepared=true;$('prepare-result').textContent=`Leo prepared in ${(state.prepare.prepareMs/1000).toFixed(1)}s; encoder released.`;$('prepare-result').className='ok';status('Leo ready','Large speech encoder is no longer resident');log('Leo prepared; speech encoder released.','ok');stop();setBusy(false)}catch(e){fail(e)}}
-$('generate').onclick=async()=>{const text=$('text').value.replace(/\s+/g,' ').trim();if(!text||text.length>MAX_TEXT)return;setBusy(true);start('staged-generation');try{state.generation=await rpc('generate',{text});const samples=new Float32Array(state.generation.waveform);if(state.outUrl)URL.revokeObjectURL(state.outUrl);state.outUrl=URL.createObjectURL(wavBlob(samples,state.generation.sampleRate||SAMPLE_RATE));$('out').src=state.outUrl;$('out-wrap').hidden=false;const rtf=(state.generation.generationMs/1000)/state.generation.audioDuration;state.generation={...state.generation,waveform:undefined,rtf};$('generate-result').textContent=`${(state.generation.generationMs/1000).toFixed(1)}s → ${state.generation.audioDuration.toFixed(1)}s audio · RTF ${rtf.toFixed(2)}×`;$('generate-result').className='ok';status('Generation complete','All large generation sessions were released');log('Staged full-Chatterbox generation completed.','ok');stop();setBusy(false)}catch(e){fail(e)}}
-$('copy').onclick=async()=>{const est=await navigator.storage?.estimate?.().catch(()=>null);const report={test:'Staged low-memory full Chatterbox iPhone diagnostic',timestamp:new Date().toISOString(),device:{userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,webGPUExposed:'gpu'in navigator,crossOriginIsolated:window.crossOriginIsolated,storageUsage:est?.usage||null,storageQuota:est?.quota||null},settings:{maxTextChars:MAX_TEXT,temperature:.9,exaggeration:.5,cfgWeight:.5,repetitionPenalty:1.2,minP:.05,maxReferenceSeconds:MAX_REF_SECONDS},init:state.init,leo:state.prepare,generation:state.generation,errors:state.errors};await navigator.clipboard.writeText(JSON.stringify(report,null,2));$('copy').textContent='Copied — paste into ChatGPT';setTimeout(()=>$('copy').textContent='Copy diagnostic report',2200)}
+$('init').onclick=async()=>{setBusy(true);start('runtime-init');status('Initializing','Checking 4-thread WASM support');try{state.init=await rpc('init');state.initialized=true;$('thread-label').textContent=`${state.init.threads||REQUESTED_THREADS} active`;$('init-result').textContent=`Runtime ready in ${((state.init.initMs||0)/1000).toFixed(1)}s · ${state.init.threads} threads.`;$('init-result').className='ok';status('4-thread runtime ready','Next: prepare Leo');log(`Runtime initialized with ${state.init.threads} threads.`,'ok');stop();setBusy(false)}catch(e){fail(e)}}
+$('prepare').onclick=async()=>{setBusy(true);start('speech-encoder');try{status('Decoding Leo',`Up to ${MAX_REF_SECONDS}s at 24 kHz`);const samples=await decodeReference(state.file);log(`Decoded ${(samples.length/SAMPLE_RATE).toFixed(1)}s Leo reference.`);state.prepare=await rpc('prepare',{samples},[samples.buffer]);state.prepared=true;$('prepare-result').textContent=`Leo prepared in ${(state.prepare.prepareMs/1000).toFixed(1)}s · ${state.prepare.threads} threads · encoder released.`;$('prepare-result').className='ok';status('Leo ready','Generate the same comparison text');log('Leo prepared; speech encoder released.','ok');stop();setBusy(false)}catch(e){fail(e)}}
+$('generate').onclick=async()=>{const text=$('text').value.replace(/\s+/g,' ').trim();if(!text||text.length>MAX_TEXT)return;setBusy(true);start('wasm4-generation');try{state.generation=await rpc('generate',{text});const samples=new Float32Array(state.generation.waveform);if(state.outUrl)URL.revokeObjectURL(state.outUrl);state.outUrl=URL.createObjectURL(wavBlob(samples,state.generation.sampleRate||SAMPLE_RATE));$('out').src=state.outUrl;$('out-wrap').hidden=false;const rtf=(state.generation.generationMs/1000)/state.generation.audioDuration;state.generation={...state.generation,waveform:undefined,rtf};$('generate-result').textContent=`Total ${(state.generation.generationMs/1000).toFixed(1)}s · tokens ${(state.generation.tokenMs/1000).toFixed(1)}s · decoder ${(state.generation.decoderMs/1000).toFixed(1)}s → ${state.generation.audioDuration.toFixed(2)}s audio · RTF ${rtf.toFixed(2)}×`;$('generate-result').className='ok';status('Generation complete',`${state.generation.threads} WASM threads`);log('4-thread Full Chatterbox generation completed.','ok');stop();setBusy(false)}catch(e){fail(e)}}
+$('copy').onclick=async()=>{const est=await navigator.storage?.estimate?.().catch(()=>null);const report={test:'Full Chatterbox 4-thread WASM iPhone diagnostic',timestamp:new Date().toISOString(),device:{userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,webGPUExposed:'gpu'in navigator,crossOriginIsolated:window.crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined',storageUsage:est?.usage||null,storageQuota:est?.quota||null},settings:{requestedWasmThreads:REQUESTED_THREADS,maxTextChars:MAX_TEXT,temperature:.9,exaggeration:.5,cfgWeight:0,repetitionPenalty:1.2,minP:.05,maxReferenceSeconds:MAX_REF_SECONDS},init:state.init,leo:state.prepare,generation:state.generation,errors:state.errors};await navigator.clipboard.writeText(JSON.stringify(report,null,2));$('copy').textContent='Copied — paste into ChatGPT';setTimeout(()=>$('copy').textContent='Copy diagnostic report',2200)}
 $('reset').onclick=()=>{try{state.worker?.terminate()}catch{};if(state.refUrl)URL.revokeObjectURL(state.refUrl);if(state.outUrl)URL.revokeObjectURL(state.outUrl);mark(null);location.reload()}
-
-const prev=localStorage.getItem('stagedChatterboxPhase');if(prev){try{const x=JSON.parse(prev);$('previous').hidden=false;$('previous').textContent=`Previous run stopped during “${x.phase}”. If you did not close the page, Safari probably terminated it under memory pressure.`;log(`Detected interrupted phase: ${x.phase}`,'warn')}catch{}mark(null)}
-setBusy(false)
+const prev=localStorage.getItem('chatterboxWasm4Phase');if(prev){try{const x=JSON.parse(prev);$('previous').hidden=false;$('previous').textContent=`Previous 4-thread run stopped during “${x.phase}”. If you did not close it, Safari may have terminated the page under memory pressure.`;log(`Detected interrupted phase: ${x.phase}`,'warn')}catch{}mark(null)}
+showIsolation();setBusy(false)
 </script>
 </body>
 </html>
