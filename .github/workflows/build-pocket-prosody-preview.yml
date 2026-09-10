@@ -24,10 +24,20 @@ jobs:
           npm test -- src/services/tts/pocketProsody.test.ts
           npm run build
 
-      - name: Snapshot static output
+      - name: Prepare Hatchable static bundle
         run: |
           rm -rf preview-dist
           cp -R dist preview-dist
+          # Hatchable validates public JS as a classic script. The Vite bundle
+          # only uses import.meta.url as the base for already-absolute /assets
+          # URLs (plus browser-inactive pdf.js Node fallbacks), so use the
+          # current page URL as the equivalent browser base in this disposable
+          # host snapshot. This does not modify app source or the prosody PR.
+          sed -i 's/import\.meta\.url/window.location.href/g' preview-dist/assets/index-*.js
+          if grep -R 'import\.meta\.url' preview-dist/assets/index-*.js; then
+            echo 'import.meta.url remains in Hatchable snapshot'
+            exit 1
+          fi
           git add -f preview-dist
 
       - name: Commit static preview
@@ -38,5 +48,5 @@ jobs:
             echo "Preview output unchanged"
             exit 0
           fi
-          git commit -m "Build Pocket prosody preview assets"
+          git commit -m "Build Hatchable-compatible Pocket prosody preview"
           git push origin HEAD:preview-pocket-prosody-build
