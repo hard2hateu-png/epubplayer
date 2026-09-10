@@ -8,37 +8,98 @@
 export interface ChunkingOptions {
   /**
    * When true, a single sentence that exceeds maxChars is split at a nearby
-   * clause/word boundary instead of being allowed to grow without bound.
+   * natural speaking boundary instead of being allowed to grow without bound.
    */
   splitLongSentences?: boolean
 }
 
+const CONJUNCTION_BREAKS = new Set([
+  'and', 'but', 'or', 'so', 'because', 'although', 'though', 'while',
+  'when', 'which', 'who', 'that', 'yet',
+])
+
+const DIALOGUE_TAG = /^(?:he|she|they|i|we|you|[A-Z][A-Za-z’'-]+)\s+(?:said|asked|replied|answered|whispered|murmured|muttered|shouted|called|added|continued|cried|sighed|laughed|told|began)\b/i
+
+function countWords(text: string): number {
+  return text.match(/\S+/g)?.length ?? 0
+}
+
+/**
+ * Score a legal whitespace split. Higher scores sound more like places where a
+ * narrator would naturally pause. The hard character limit is still absolute.
+ */
+function scoreSplitBoundary(text: string, cut: number, limit: number): number {
+  const left = text.slice(0, cut).trimEnd()
+  const right = text.slice(cut).trimStart()
+  if (!left || !right) return Number.NEGATIVE_INFINITY
+
+  // Closing quotes/brackets belong to the punctuation before them when judging
+  // whether this is a natural pause: question?" is still a question boundary.
+  const leftWithoutClosers = left.replace(/["'”’\)\]]+$/, '')
+  const last = leftWithoutClosers.at(-1) ?? ''
+  let score = 35
+
+  if (/[.!?…]/.test(last)) score = 120
+  else if (/[;:—–]/.test(last)) score = 105
+  else if (last === ',') score = 95
+  else if (last === '-') score = 80
+  else {
+    const nextWord = right.match(/^[A-Za-z’'-]+/)?.[0]?.toLowerCase() ?? ''
+    if (CONJUNCTION_BREAKS.has(nextWord)) score = 68
+  }
+
+  // Never favor a boundary that strands a closing quote on the next page.
+  if (/^[”’"](?:\s|$)/.test(right)) score -= 160
+
+  // A quoted line and its attribution are one spoken thought. Prefer splitting
+  // earlier in the sentence rather than producing: “…newsreader?” | she asked…
+  if (/[.!?…]["”’]\s*$/.test(left) && DIALOGUE_TAG.test(right)) score -= 145
+
+  // If the whole remainder is only a little larger than one request, strongly
+  // discourage leaving a tiny one-to-four-word final page.
+  if (
+    text.length <= Math.floor(limit * 1.45) &&
+    (countWords(right) <= 4 || right.length < 28)
+  ) {
+    score -= 115
+  }
+
+  // Among equally natural pauses, prefer one closer to the limit so requests do
+  // useful work without letting raw character count override prosody.
+  score -= ((limit - cut) / limit) * 24
+  return score
+}
+
 /**
  * Split an oversized sentence without cutting through normal words.
- * Prefer punctuation/clause boundaries in the latter half of the window, then
- * fall back to whitespace. A pathological >limit token is hard-split only as a
- * final fallback so the caller still gets a real maximum.
+ * Prefer breath/pause punctuation, then conjunctions, then ordinary whitespace.
+ * A pathological >limit token is hard-split only as a final fallback.
  */
 function splitOversizedSentence(sentence: string, limit: number): string[] {
   const pieces: string[] = []
   let remaining = sentence.trim()
 
   while (remaining.length > limit) {
-    const minNaturalCut = Math.max(1, Math.floor(limit * 0.55))
+    const minNaturalCut = Math.max(1, Math.floor(limit * 0.45))
+    const maxCut = Math.min(limit, remaining.length - 1)
     let cut = -1
+    let bestScore = Number.NEGATIVE_INFINITY
 
-    // Prefer a clause boundary close to the limit. Keep punctuation attached to
-    // the phrase before the split so prosody remains as natural as possible.
-    for (let i = Math.min(limit, remaining.length - 1); i >= minNaturalCut; i--) {
-      if (/\s/.test(remaining[i]) && /[,;:—–-]/.test(remaining[i - 1] || '')) {
+    // Evaluate every legal whitespace boundary in the useful part of the window
+    // instead of blindly taking the final comma/space before the hard ceiling.
+    for (let i = minNaturalCut; i <= maxCut; i++) {
+      if (!/\s/.test(remaining[i])) continue
+      const score = scoreSplitBoundary(remaining, i, limit)
+      if (score > bestScore) {
+        bestScore = score
         cut = i
-        break
       }
     }
 
-    // Otherwise split at the latest normal whitespace before the hard limit.
+    // If there is no candidate in the preferred window, use the latest ordinary
+    // whitespace before the hard limit.
     if (cut < 0) {
-      for (let i = Math.min(limit, remaining.length - 1); i >= 1; i--) {
+      for (let i = maxCut; i >= 1; i--) {
         if (/\s/.test(remaining[i])) {
           cut = i
           break
@@ -61,9 +122,11 @@ function splitOversizedSentence(sentence: string, limit: number): string[] {
 
 /**
  * Split text into chunks at sentence boundaries.
- * - Combines sentences until hitting the character limit
+ * - Combines complete sentences until hitting the character limit
  * - By default, preserves a sentence even if it exceeds the limit
  * - With splitLongSentences, oversized sentences are safely bounded
+ * - Oversized sentence pieces stay together as their own sequence so a page does
+ *   not end halfway into a sentence merely because the previous sentence had room
  */
 export function splitTextIntoChunks(
   text: string,
@@ -82,35 +145,43 @@ export function splitTextIntoChunks(
     .trim()
   if (!normalized) return []
 
-  // Split into sentences. Pocket and other constrained engines may additionally
-  // break a rare oversized sentence at a natural clause/word boundary.
   const sentences = splitIntoSentences(normalized)
   if (sentences.length === 0) return []
-  const units = options.splitLongSentences
-    ? sentences.flatMap((sentence) =>
-        sentence.length > limit ? splitOversizedSentence(sentence, limit) : [sentence]
-      )
-    : sentences
 
-  // Combine sentences/units into chunks, respecting the limit.
   const chunks: string[] = []
   let current = ''
 
-  for (const sentence of units) {
+  const flushCurrent = () => {
+    if (!current) return
+    chunks.push(current)
+    current = ''
+  }
+
+  const addCompleteSentence = (sentence: string) => {
     if (!current) {
       current = sentence
     } else if (current.length + 1 + sentence.length <= limit) {
       current += ' ' + sentence
     } else {
-      chunks.push(current)
+      flushCurrent()
       current = sentence
     }
   }
 
-  if (current) {
-    chunks.push(current)
+  for (const sentence of sentences) {
+    if (!options.splitLongSentences || sentence.length <= limit) {
+      addCompleteSentence(sentence)
+      continue
+    }
+
+    // Keep the beginning of a long sentence off the tail of the previous page.
+    // This costs an occasional extra Pocket request but produces much cleaner
+    // screen/audio transitions and remains fully bounded by the same hard limit.
+    flushCurrent()
+    chunks.push(...splitOversizedSentence(sentence, limit))
   }
 
+  flushCurrent()
   return chunks
 }
 
@@ -125,7 +196,7 @@ function splitIntoSentences(text: string): string[] {
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
-    
+
     // Check for sentence-ending punctuation
     if (ch !== '.' && ch !== '!' && ch !== '?' && ch !== '…') {
       continue
@@ -142,7 +213,8 @@ function splitIntoSentences(text: string): string[] {
       }
     }
 
-    // Only split if followed by whitespace or end of string
+    // Only split if followed by whitespace or end of string. A closing quote
+    // followed by a dialogue tag intentionally remains part of the same sentence.
     if (end === text.length || /\s/.test(text[end])) {
       const sentence = text.slice(start, end).trim()
       if (sentence) {
@@ -153,7 +225,7 @@ function splitIntoSentences(text: string): string[] {
       while (end < text.length && /\s/.test(text[end])) {
         end++
       }
-      
+
       start = end
       i = end - 1
     }
