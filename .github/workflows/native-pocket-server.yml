@@ -1,0 +1,21 @@
+name: Native Pocket Server
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'native-pocket-server/**'
+      - '.github/workflows/native-pocket-server.yml'
+
+jobs:
+  build-container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check Python syntax
+        run: python -m py_compile native-pocket-server/app.py
+
+      - name: Build CPU-only Pocket container
+        run: docker build -t epubplayer-pocket-native native-pocket-server
