@@ -19,7 +19,7 @@ const NEUTRAL_URL = `${HF}/pt_neutral_latent_f32.bin`
 const ALBA_URL = `${HF}/voices/pt_voice_alba.bin`
 const TOKENIZER_URL =
   'https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/main/languages/english/tokenizer.model'
-const LITERT_WASM = 'https://cdn.jsdelivr.net/npm/@litertjs/core@2.5.3/wasm/'
+const LITERT_WASM = '/litert-wasm/'
 
 const SAMPLE_RATE = 24_000
 const SAMPLES_PER_FRAME = 1_920
@@ -46,6 +46,13 @@ const scope = self as unknown as {
 
 function status(stage: string, detail?: string): void {
   scope.postMessage({ type: 'status', stage, detail })
+}
+
+function configureLiteRtAssetLocator(): void {
+  const base = new URL(LITERT_WASM, self.location.origin)
+  ;(globalThis as unknown as { Module?: { locateFile: (filename: string) => string } }).Module = {
+    locateFile: (filename: string) => new URL(filename, base).toString(),
+  }
 }
 
 function shapeSize(shape: ArrayLike<number>): number {
@@ -476,6 +483,7 @@ async function runProbe(): Promise<void> {
 
   const totalStarted = performance.now()
   status('Starting Google LiteRT…')
+  configureLiteRtAssetLocator()
   await loadLiteRt(LITERT_WASM)
 
   const [embeddingBuffer, inputLinearBuffer, bosBuffer, neutralBuffer, voiceBuffer, tokenizer] =

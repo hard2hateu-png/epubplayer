@@ -3,6 +3,30 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { lingui } from '@lingui/vite-plugin'
+import { copyFileSync, mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+
+const LITERT_RUNTIME_FILES = [
+  'litert_wasm_internal.js',
+  'litert_wasm_internal.wasm',
+  'litert_wasm_compat_internal.js',
+  'litert_wasm_compat_internal.wasm',
+]
+
+function copyLiteRtRuntime() {
+  return {
+    name: 'copy-litert-runtime',
+    closeBundle() {
+      const sourceDir = resolve(process.cwd(), 'node_modules/@litertjs/core/wasm')
+      const outputDir = resolve(process.cwd(), 'dist/litert-wasm')
+      mkdirSync(outputDir, { recursive: true })
+      for (const file of LITERT_RUNTIME_FILES) {
+        copyFileSync(resolve(sourceDir, file), resolve(outputDir, file))
+      }
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -14,6 +38,7 @@ export default defineConfig({
     }),
     lingui(),
     tailwindcss(),
+    copyLiteRtRuntime(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-v2.png', 'app-icon-192.png', 'app-icon-512.png', 'og-image.png'],
