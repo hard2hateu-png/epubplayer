@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Chatterbox Nano iPhone Test</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b0d12; color: #f5f6f7; min-height: 100vh; }
+    main { width: min(760px, 100%); margin: 0 auto; padding: max(22px, env(safe-area-inset-top)) 18px max(40px, env(safe-area-inset-bottom)); }
+    h1 { font-size: 27px; line-height: 1.15; margin: 0 0 8px; }
+    h2 { font-size: 17px; margin: 0 0 12px; }
+    p { line-height: 1.45; color: #c7cbd2; }
+    .lede { margin-top: 0; }
+    .card { background: #151922; border: 1px solid #282e3a; border-radius: 18px; padding: 16px; margin: 14px 0; }
+    .notice { background: #191a20; border-left: 3px solid #747d90; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; color: #d9dce1; }
+    .warnbox { background: #211b12; border-color: #564423; }
+    #previous-run { margin-top: 12px; }
+    #device-info { display: grid; gap: 7px; font-size: 14px; color: #cdd1d7; }
+    #device-info span { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #242a35; padding-bottom: 7px; }
+    #device-info span:last-child { border: 0; padding-bottom: 0; }
+    label { display: block; font-size: 13px; color: #aeb4bf; margin: 10px 0 6px; }
+    select, textarea, input[type="file"] { width: 100%; background: #0f1218; color: #f4f5f7; border: 1px solid #303746; border-radius: 12px; padding: 11px 12px; font: inherit; }
+    textarea { min-height: 105px; resize: vertical; line-height: 1.4; }
+    button { width: 100%; border: 0; border-radius: 13px; padding: 13px 14px; font-size: 16px; font-weight: 650; background: #e8eaf0; color: #111318; margin-top: 10px; }
+    button.secondary { background: #252b36; color: #f3f4f6; }
+    button.danger { background: #322127; color: #ffdfe7; }
+    button:disabled { opacity: .4; }
+    body.busy button:not(#reset-button) { pointer-events: none; }
+    .status { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    #status-title { font-weight: 700; }
+    #status-detail { color: #9ea6b4; font-size: 13px; margin-top: 4px; line-height: 1.35; }
+    #elapsed { font-variant-numeric: tabular-nums; color: #c9ced7; font-size: 13px; min-width: 52px; text-align: right; }
+    .result { font-size: 14px; line-height: 1.4; margin-top: 10px; color: #bac0ca; }
+    .ok { color: #a9e9c2 !important; }
+    .warn { color: #f1d28d !important; }
+    .error { color: #ff9cae !important; }
+    audio { width: 100%; margin-top: 12px; }
+    #log { background: #090b0f; border: 1px solid #242a35; border-radius: 12px; padding: 10px; height: 220px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .log-row { color: #aeb5c1; margin-bottom: 5px; }
+    .log-row.ok { color: #90ddb0; }
+    .log-row.warn { color: #e6c36d; }
+    .log-row.error { color: #ff8ea3; }
+    small { display: block; color: #8f97a4; line-height: 1.4; margin-top: 8px; }
+    .step { color: #8d96a5; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .privacy { font-size: 13px; color: #aab0ba; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="step">Isolated diagnostic</div>
+    <h1>Chatterbox Nano on iPhone</h1>
+    <p class="lede">This page does not touch the EPUB reader or register a new TTS engine. It only tests whether the smaller Chatterbox Nano ONNX model can load, condition on Leo, and survive repeated local generations on this device.</p>
+
+    <div class="notice warnbox">
+      The first model load is large: roughly 547 MiB of published Nano files. Keep Safari in the foreground and preferably use Wi‑Fi. The default backend is single-threaded WASM because current ONNX Runtime Web does not officially support WebGPU on Safari/iOS.
+    </div>
+    <div id="previous-run" class="notice warnbox" hidden></div>
+
+    <section class="card">
+      <h2>Device</h2>
+      <div id="device-info">Reading capabilities…</div>
+    </section>
+
+    <section class="card">
+      <h2>Current status</h2>
+      <div class="status">
+        <div>
+          <div id="status-title">Ready to start</div>
+          <div id="status-detail">Nothing has been downloaded yet.</div>
+        </div>
+        <div id="elapsed"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="step">1 · Reference</div>
+      <h2>Leo</h2>
+      <p id="reference-status">Checking this browser’s private voice cache…</p>
+      <label for="file-input">If Leo is not found, choose the original Leo audio file</label>
+      <input id="file-input" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac" />
+      <small>Only a speech-dense 12-second section is decoded. The audio is sent to the local worker on this phone; this test does not upload it to a server.</small>
+    </section>
+
+    <section class="card">
+      <div class="step">2 · Model</div>
+      <h2>Load Nano</h2>
+      <label for="backend">Runtime</label>
+      <select id="backend">
+        <option value="wasm" selected>WASM · safest iPhone test</option>
+        <option value="webgl">WebGL · experimental</option>
+        <option value="webgpu">WebGPU · experimental / likely unsupported by ORT on iOS</option>
+      </select>
+      <button id="load-button">Load Chatterbox Nano</button>
+      <div id="model-result" class="result"></div>
+      <small>Once loading starts, do not switch apps. If Safari kills/reloads the page, the diagnostic will flag the interrupted phase on the next load.</small>
+    </section>
+
+    <section class="card">
+      <div class="step">3 · Voice</div>
+      <h2>Prepare Leo</h2>
+      <button id="prepare-button" disabled>Prepare Leo locally</button>
+      <div id="voice-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <div class="step">4 · One sentence</div>
+      <h2>Generate a sample</h2>
+      <label for="test-text">Test text</label>
+      <textarea id="test-text" maxlength="180"></textarea>
+      <button id="generate-button" disabled>Generate with Leo</button>
+      <div id="generation-result" class="result"></div>
+      <div id="audio-wrap" hidden><audio id="audio" controls preload="metadata"></audio></div>
+    </section>
+
+    <section class="card">
+      <div class="step">5 · Stability</div>
+      <h2>10-chunk stress test</h2>
+      <p>This runs ten short audiobook-style sentences one after another using the same prepared Leo conditioning. It does not retain all ten audio files.</p>
+      <button id="stress-button" disabled>Run 10 consecutive generations</button>
+      <div id="stress-progress" class="result"></div>
+      <div id="stress-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>Diagnostic log</h2>
+      <div id="log"></div>
+      <button id="copy-button" class="secondary">Copy diagnostic report</button>
+      <button id="reset-button" class="danger">Reset test</button>
+      <p class="privacy">After the test, copy the report and paste it into our ChatGPT conversation. The report contains device/runtime timings and errors, not the Leo recording.</p>
+    </section>
+  </main>
+  <script type="module" src="/nano-test.js?v=20260910b"></script>
+</body>
+</html>
