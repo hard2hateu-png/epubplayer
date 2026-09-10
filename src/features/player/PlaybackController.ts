@@ -915,6 +915,7 @@ class PlaybackController {
    * - supertonic: supertonicVoice
    * - sherpa: sherpaVoice
    * - kitten: kittenVoice
+   * - pocket/chatterbox: voiceId (Leo-specific cache identity)
    */
   private getVoiceForEngine(settings: {
     voiceId: string

@@ -24,6 +24,7 @@
     "i18n:compile": "lingui compile"
   },
   "dependencies": {
+    "@gradio/client": "2.5.1",
     "@lingui/core": "^5.7.0",
     "@lingui/macro": "^5.7.0",
     "@lingui/react": "^5.7.0",

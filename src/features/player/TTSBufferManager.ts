@@ -31,9 +31,12 @@ type BufferContext = {
 
 type ChunkKey = string
 const POCKET_AUDIO_CACHE_VERSION = 'pocket-leo-v4-12s'
+const CHATTERBOX_AUDIO_CACHE_VERSION = 'chatterbox-turbo-leo-v1'
 
 function cacheModelConfig(ctx: BufferContext): string {
-  return ctx.engine === 'pocket' ? `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}` : ctx.modelConfig
+  if (ctx.engine === 'pocket') return `${ctx.modelConfig}:${POCKET_AUDIO_CACHE_VERSION}`
+  if (ctx.engine === 'chatterbox') return `${ctx.modelConfig}:${CHATTERBOX_AUDIO_CACHE_VERSION}`
+  return ctx.modelConfig
 }
 
 function makeChunkKey(ctx: BufferContext, chunk: ChunkInfo): ChunkKey {
@@ -64,7 +67,7 @@ const IOS_MAX_BUFFER_CHUNKS = 12
 const IOS_POCKET_MAX_BUFFER_CHUNKS = 2
 
 function getIOSBufferLimit(engine?: TTSEngine): number {
-  return engine === 'pocket' ? IOS_POCKET_MAX_BUFFER_CHUNKS : IOS_MAX_BUFFER_CHUNKS
+  return engine === 'pocket' || engine === 'chatterbox' ? IOS_POCKET_MAX_BUFFER_CHUNKS : IOS_MAX_BUFFER_CHUNKS
 }
 
 export class TTSBufferManager {

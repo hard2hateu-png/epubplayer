@@ -33,3 +33,7 @@ export type { KittenConfig, KittenGeneratedAudio, KittenVoiceId } from './kitten
 // Pocket TTS custom voice service
 export { pocketService, POCKET_VOICE_NAME, POCKET_VOICE_ID } from './pocketService'
 export type { PocketConfig, PocketGeneratedAudio } from './pocketService'
+
+// Chatterbox-Turbo remote voice-clone service
+export { chatterboxService } from './chatterboxService'
+export type { ChatterboxGeneratedAudio } from './chatterboxService'

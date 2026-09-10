@@ -16,6 +16,7 @@ import { supertonicService } from './supertonicService'
 import { sherpaService } from './sherpaService'
 import { kittenService } from './kittenService'
 import { pocketService } from './pocketService'
+import { chatterboxService } from './chatterboxService'
 import type {
   TTSEngine,
   TTSEngineInfo,
@@ -69,6 +70,17 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
     id: 'pocket',
     name: 'Pocket TTS (Leo)',
     description: 'Custom local Leo voice clone. Runs on-device and uses the normal generated-audio cache.',
+    available: true,
+    capabilities: {
+      generatesBlobs: true,
+      requiresInit: true,
+      slowOnCPU: false,
+    },
+  },
+  chatterbox: {
+    id: 'chatterbox',
+    name: 'Chatterbox (Leo)',
+    description: 'English Chatterbox-Turbo voice cloning using the saved Leo reference.',
     available: true,
     capabilities: {
       generatesBlobs: true,
@@ -263,6 +275,11 @@ class TTSManager {
           await pocketService.initialize()
           break
 
+        case 'chatterbox':
+          this.wireUpService(chatterboxService, 'chatterbox')
+          await chatterboxService.initialize()
+          break
+
         case 'browser':
           // Browser TTS doesn't need initialization
           break
@@ -399,6 +416,17 @@ class TTSManager {
           }
         }
 
+        case 'chatterbox': {
+          const result = await chatterboxService.generateChunk(text, chunkIndex)
+          return {
+            requestId: result.requestId,
+            blob: result.blob,
+            duration: result.duration,
+            chunkIndex: result.chunkIndex,
+            text: result.text,
+          }
+        }
+
         default:
           throw new Error(`Unknown TTS engine: ${this.currentEngine}`)
       }
@@ -423,6 +451,8 @@ class TTSManager {
         return kittenService.splitIntoChunks(text)
       case 'pocket':
         return pocketService.splitIntoChunks(text)
+      case 'chatterbox':
+        return chatterboxService.splitIntoChunks(text)
       default:
         return kokoroTTS.splitIntoChunks(text)
     }
@@ -475,6 +505,9 @@ class TTSManager {
       case 'pocket':
         pocketService.cancelAll()
         break
+      case 'chatterbox':
+        chatterboxService.cancelAll()
+        break
     }
   }
 
@@ -498,8 +531,13 @@ class TTSManager {
       case 'pocket':
         pocketService.destroy()
         break
+      case 'chatterbox':
+        chatterboxService.destroy()
+        break
     }
     this.isInitialized = false
+    this.isInitializing = false
+    this.initPromise = null
   }
 
   async setEngine(engine: TTSEngine): Promise<void> {
