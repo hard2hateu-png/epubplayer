@@ -608,7 +608,11 @@ class PocketService {
   }
 
   splitIntoChunks(text: string): string[] {
-    return splitTextIntoChunks(text, Math.min(this.config?.maxChunkChars || MAX_CHUNK_CHARS, MAX_CHUNK_CHARS))
+    return splitTextIntoChunks(
+      text,
+      Math.min(this.config?.maxChunkChars || MAX_CHUNK_CHARS, MAX_CHUNK_CHARS),
+      { dialogueAwareSentenceSplits: true },
+    )
   }
   cancelAll(): void { this.cancelEpoch++; void this.runtime?.stop() }
   destroy(): void {

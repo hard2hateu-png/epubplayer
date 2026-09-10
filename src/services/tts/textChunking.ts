@@ -11,6 +11,12 @@ export interface ChunkingOptions {
    * natural speaking boundary instead of being allowed to grow without bound.
    */
   splitLongSentences?: boolean
+  /**
+   * Pocket-only narration mode: treat sentence punctuation followed by closing
+   * quotes/brackets as a real boundary, except when a dialogue attribution such
+   * as “she asked” immediately follows. Defaults off so other engines are unchanged.
+   */
+  dialogueAwareSentenceSplits?: boolean
 }
 
 const CONJUNCTION_BREAKS = new Set([
@@ -145,7 +151,7 @@ export function splitTextIntoChunks(
     .trim()
   if (!normalized) return []
 
-  const sentences = splitIntoSentences(normalized)
+  const sentences = splitIntoSentences(normalized, options.dialogueAwareSentenceSplits === true)
   if (sentences.length === 0) return []
 
   const chunks: string[] = []
@@ -190,7 +196,7 @@ export function splitTextIntoChunks(
  * Handles common punctuation: . ! ? …
  * Keeps punctuation attached to the sentence.
  */
-function splitIntoSentences(text: string): string[] {
+function splitIntoSentences(text: string, dialogueAware = false): string[] {
   const sentences: string[] = []
   let start = 0
 
@@ -213,21 +219,36 @@ function splitIntoSentences(text: string): string[] {
       }
     }
 
-    // Only split if followed by whitespace or end of string. A closing quote
-    // followed by a dialogue tag intentionally remains part of the same sentence.
-    if (end === text.length || /\s/.test(text[end])) {
-      const sentence = text.slice(start, end).trim()
+    // Pocket narration can treat punctuation plus closing quotes/brackets as a
+    // complete sentence boundary. Keep a true dialogue attribution attached:
+    // “Are you coming?” she asked. should remain one spoken thought, while
+    // “Are you coming?” He turned away. should split after the closing quote.
+    let boundaryEnd = end
+    if (dialogueAware) {
+      while (boundaryEnd < text.length && /["'”’\)\]]/.test(text[boundaryEnd])) {
+        boundaryEnd++
+      }
+    }
+
+    if (boundaryEnd === text.length || /\s/.test(text[boundaryEnd])) {
+      let nextStart = boundaryEnd
+      while (nextStart < text.length && /\s/.test(text[nextStart])) {
+        nextStart++
+      }
+
+      const hasCloser = boundaryEnd > end
+      if (dialogueAware && hasCloser && DIALOGUE_TAG.test(text.slice(nextStart))) {
+        i = end - 1
+        continue
+      }
+
+      const sentence = text.slice(start, boundaryEnd).trim()
       if (sentence) {
         sentences.push(sentence)
       }
 
-      // Skip whitespace after the sentence
-      while (end < text.length && /\s/.test(text[end])) {
-        end++
-      }
-
-      start = end
-      i = end - 1
+      start = nextStart
+      i = nextStart - 1
     }
   }
 
