@@ -629,6 +629,12 @@ export function SettingsPage() {
             await settingsRepository.set('kittenVoice', 'expr-voice-2-m')
             setSettings((prev) => ({ ...prev, kittenVoice: 'expr-voice-2-m' }))
           } else if (engine === 'pocket') {
+            // Keep the current working engine until native Leo is actually ready.
+            const hasLeo = await pocketService.hasLeoVoiceSample()
+            if (!hasLeo) {
+              setActiveSheet('pocketLeo')
+              return
+            }
             // Unique cache identity for Leo. Pocket itself always uses the local Leo clone.
             await settingsRepository.set('voiceId', 'pocket:leo')
             setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
