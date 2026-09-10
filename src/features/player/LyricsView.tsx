@@ -133,6 +133,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
   const [blobProgress, setBlobProgress] = useState(0)
   const [usesWordBoundaries, setUsesWordBoundaries] = useState(false)
   const currentSectionTitle = usePlayerStore((s) => s.currentSectionTitle)
+  const isBuffering = usePlayerStore((s) => s.isBuffering)
   const containerRef = useRef<HTMLDivElement>(null)
   const activeWordRef = useRef<HTMLSpanElement>(null)
   const activeHighlightRef = useRef<HTMLSpanElement>(null)
@@ -163,8 +164,9 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
   const highlightRanges = useMemo(() => splitIntoHighlightRanges(chunkText), [chunkText])
 
   // Exact word boundaries are available only for browser TTS. For generated
-  // audio (Supertonic/Kokoro/Piper), poll playback time to estimate which fixed
-  // phrase is currently being spoken. This never seeks or alters playback.
+  // audio, poll playback time to estimate which fixed phrase is currently spoken.
+  // While buffering a newly advanced chunk, do NOT read the backend's previous
+  // finished blob: that stale 100% time made the new chunk jump to its last line.
   useEffect(() => {
     const backend = playbackController.getAudioBackend()
 
@@ -184,6 +186,12 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
 
     if (backend instanceof AudioBlobBackend) {
       const updateProgress = () => {
+        // Read the live store rather than closing over a stale render. The state
+        // can flip from buffering → playing between polling ticks.
+        if (usePlayerStore.getState().isBuffering) {
+          setBlobProgress(0)
+          return
+        }
         const duration = backend.getDuration()
         const currentTime = backend.getCurrentTime()
         const progress = duration > 0 ? currentTime / duration : 0
@@ -227,7 +235,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
   }, [blobProgress, chunkText.length, usesWordBoundaries])
 
   const activeHighlightIndex = useMemo(() => {
-    if (usesWordBoundaries || highlightRanges.length === 0) return -1
+    if (usesWordBoundaries || isBuffering || highlightRanges.length === 0) return -1
 
     const exact = highlightRanges.findIndex(
       (range) => estimatedBlobChar >= range.start && estimatedBlobChar < range.end
@@ -239,7 +247,7 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     if (next >= 0) return Math.max(0, next - 1)
 
     return highlightRanges.length - 1
-  }, [estimatedBlobChar, highlightRanges, usesWordBoundaries])
+  }, [estimatedBlobChar, highlightRanges, usesWordBoundaries, isBuffering])
 
   // Every TTS chunk is a fresh visual page. Reset the reader before paint so a
   // previous page's scroll position cannot flash or carry into the next one.
@@ -251,9 +259,9 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     if (container) container.scrollTop = 0
   }, [chunkText])
 
-  // Scroll only when the active word/phrase would actually be clipped. Move the
-  // minimum distance needed to reveal it — no continuous tracking and no forced
-  // end-of-page nudge when the current highlight is already visible.
+  // Scroll only when the active word/phrase would actually be clipped. During
+  // buffering there is no active generated-audio phrase, so the next page simply
+  // waits at the top instead of scrolling to the stale end position.
   useEffect(() => {
     const active = usesWordBoundaries ? activeWordRef.current : activeHighlightRef.current
     const container = containerRef.current
