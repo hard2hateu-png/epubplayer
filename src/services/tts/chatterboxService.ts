@@ -58,9 +58,12 @@ function randomClientId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(24)
+    crypto.getRandomValues(bytes)
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
 }
 
 function getClientId(): string {
@@ -200,48 +203,29 @@ class ChatterboxService {
     this.onProgressCallback?.('Preparing Leo on Chatterbox…')
     const reference = await findLeoReference()
     const referenceBase64 = await blobToDataUrl(reference)
+    const result = await this.postJson<PrepareResponse>(
+      '/prepare',
+      { clientId, referenceBase64 },
+      PREPARE_TIMEOUT_MS,
+    )
 
-    try {
-      const result = await this.postJson<PrepareResponse>(
-        '/prepare',
-        { clientId, referenceBase64 },
-        PREPARE_TIMEOUT_MS,
-      )
-
-      if (result.status !== 'ready') {
-        throw new Error(result.error || 'Could not prepare Leo on Chatterbox')
-      }
-    } finally {
-      // Drop the large base64 string as soon as the request completes.
-      // Nothing is written to IndexedDB/localStorage or bundled with the app.
+    if (result.status !== 'ready') {
+      throw new Error(result.error || 'Could not prepare Leo on Chatterbox')
     }
   }
 
   async generateChunk(text: string, chunkIndex: number): Promise<ChatterboxGeneratedAudio> {
-    let resolveRun!: (value: ChatterboxGeneratedAudio) => void
-    let rejectRun!: (reason?: unknown) => void
-    const resultPromise = new Promise<ChatterboxGeneratedAudio>((resolve, reject) => {
-      resolveRun = resolve
-      rejectRun = reject
-    })
-
-    const previous = this.generationTail
-    this.generationTail = (async () => {
-      try {
-        await previous
-        resolveRun(await this.generateChunkSerial(text, chunkIndex))
-      } catch (error) {
-        rejectRun(error)
-      }
-    })()
-
-    return resultPromise
+    const run = this.generationTail.then(
+      () => this.generateChunkSerial(text, chunkIndex),
+      () => this.generateChunkSerial(text, chunkIndex),
+    )
+    this.generationTail = run.then(() => undefined, () => undefined)
+    return run
   }
 
   private async generateChunkSerial(text: string, chunkIndex: number): Promise<ChatterboxGeneratedAudio> {
     if (!this.isReady) await this.initialize()
 
-    const cleanedText = ' '.join ? text : text
     const normalized = text.replace(/\s+/g, ' ').trim()
     if (!normalized) throw new Error('Cannot synthesize empty text')
     if (normalized.length > MAX_CHUNK_CHARS) {
@@ -285,11 +269,12 @@ class ChatterboxService {
       this.onAudioCallback?.(audio)
       return audio
     } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        const message = error instanceof Error ? error.message : String(error)
-        this.onErrorCallback?.(message, requestId)
-        log.error('Chatterbox generation failed', { requestId, message })
+      if (epoch !== this.cancelEpoch) {
+        throw new DOMException('Generation cancelled', 'AbortError')
       }
+      const message = error instanceof Error ? error.message : String(error)
+      this.onErrorCallback?.(message, requestId)
+      log.error('Chatterbox generation failed', { requestId, message })
       throw error
     }
   }
