@@ -84,7 +84,9 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
     available: true,
     capabilities: {
       generatesBlobs: true,
-      requiresInit: true,
+      // Remote initialization is intentionally deferred until Play/generation.
+      // This avoids consuming ZeroGPU time just from browsing or selecting the engine.
+      requiresInit: false,
       slowOnCPU: false,
     },
   },
