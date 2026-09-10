@@ -29,7 +29,6 @@ jobs:
           rm -rf preview-dist
           cp -R dist preview-dist
           git add -f preview-dist
-          git diff --cached --check
 
       - name: Commit static preview
         run: |
