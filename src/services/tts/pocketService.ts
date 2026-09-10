@@ -14,12 +14,16 @@ const VOICE_CACHE = 'epub-player-pocket-voices-v2'
 const LEGACY_VOICE_CACHE = 'epub-player-pocket-voices-v1'
 const LEGACY_REFERENCE_PATH = '/__epubplayer/pocket/voices/leo'
 const REFERENCE_PATH = '/__epubplayer/pocket/voices/leo-reference-v2'
-const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v4-single-12s'
+const EMBEDDING_PATH = '/__epubplayer/pocket/voices/leo-embedding-v5-clarity-12s'
 const VOICE_REF = 'custom:leo'
-const EMBEDDING_MAGIC = 'LEOEMB04'
+const EMBEDDING_MAGIC = 'LEOEMB05'
 const SAMPLE_RATE = 24_000
 const REFERENCE_SECONDS = 42.65
 const CONDITIONING_SECONDS = 12
+// Spectral analysis of the fixed Leo reference found this continuous region to
+// be clearer than the prior loudness-only winner while preserving the same
+// 12-second iOS memory budget. This is an experiment branch only.
+const LEO_CLARITY_START_SECONDS = 21.25
 const MAX_CHUNK_CHARS = 220
 
 export interface PocketConfig { maxChunkChars: number }
@@ -280,9 +284,19 @@ function selectRepresentativeWindow(input: Float32Array, sampleRate: number, sec
   const windowSamples = Math.min(input.length, Math.max(1, Math.floor(sampleRate * seconds)))
   if (input.length <= windowSamples) return input.slice()
 
-  // Pick one continuous, speech-dense window. We score 250 ms blocks by RMS
-  // energy and choose the 12-second run with the highest sustained energy.
-  // This avoids silence without averaging or splicing separate voice embeddings.
+  // Leo uses a fixed private reference clip. The previous loudness-only selector
+  // consistently chose about 18.5–30.5 s. Offline spectral analysis of the same
+  // recording found 21.25–33.25 s to have a higher speech centroid/rolloff and
+  // less low-mid concentration, so test that cleaner continuous region first.
+  // No EQ, denoising, resynthesis, splicing, or runtime playback processing is
+  // applied; Pocket still receives ordinary mono PCM and exactly 12 seconds.
+  const preferredStart = Math.floor(sampleRate * LEO_CLARITY_START_SECONDS)
+  if (input.length >= preferredStart + windowSamples) {
+    return input.slice(preferredStart, preferredStart + windowSamples)
+  }
+
+  // Safety fallback for an unexpectedly shorter replacement reference: retain
+  // the stable speech-density selector rather than failing voice preparation.
   const blockSamples = Math.max(1, Math.floor(sampleRate * 0.25))
   const blockCount = Math.ceil(input.length / blockSamples)
   const energies = new Float64Array(blockCount)
@@ -531,13 +545,14 @@ class PocketService {
         // Never average or concatenate independently encoded voice sequences.
         const conditioningPcm = selectRepresentativeWindow(pcm, rate, CONDITIONING_SECONDS)
         if (conditioningPcm.length < rate) throw new Error('Leo conditioning clip is too short')
-        this.onProgressCallback?.('Preparing Leo from a continuous 12-second reference...', 99)
+        this.onProgressCallback?.('Preparing Leo from the clearer 12-second reference window...', 99)
         const embedding = await candidate.cloneVoice(conditioningPcm)
 
         await this.saveEmbedding(embedding)
         log.info('Prepared Leo from one continuous reference', {
           storedSeconds: pcm.length / rate,
           conditioningSeconds: conditioningPcm.length / rate,
+          conditioningStartSeconds: LEO_CLARITY_START_SECONDS,
         })
 
         if (isIOSDevice()) {
