@@ -148,16 +148,17 @@ export function runLiteRTPocketProbe(
       )
     }
 
-    generator = makeClassicWorker(
+    const generationWorker = makeClassicWorker(
       new URL('./litertPocketProbe.worker.ts', import.meta.url),
       'pocket-litert-alba-generator',
     )
+    generator = generationWorker
 
-    generator.onerror = (event) => {
+    generationWorker.onerror = (event) => {
       fail(event.message || 'Pocket LiteRT generation worker crashed.')
     }
 
-    generator.onmessage = (event: MessageEvent<GeneratorMessage>) => {
+    generationWorker.onmessage = (event: MessageEvent<GeneratorMessage>) => {
       const message = event.data
       if (message.type === 'status') {
         onStatus?.(message.stage, message.detail)
@@ -175,7 +176,7 @@ export function runLiteRTPocketProbe(
       const latentFrames = message.latentFrames
 
       // Hard-stop the large flow-LM worker before creating any decoder runtime.
-      generator.terminate()
+      generationWorker.terminate()
       generator = null
       onStatus?.('Releasing Pocket GPU memory…', 'The decoder will start separately in about 1.5 seconds.')
 
@@ -185,6 +186,6 @@ export function runLiteRTPocketProbe(
       }, 1500)
     }
 
-    generator.postMessage({ type: 'generate-only' })
+    generationWorker.postMessage({ type: 'generate-only' })
   })
 }
