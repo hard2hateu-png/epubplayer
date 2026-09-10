@@ -36,6 +36,8 @@ export function BookDetailPage() {
     )
   }
 
+  const originalFile = book.epubBlob ?? book.originalBlob
+
   const handlePlay = async () => {
     // Load the book into the playback manager
     await playbackController.loadBook({
@@ -70,15 +72,17 @@ export function BookDetailPage() {
     }
   }
 
-  const handleDownloadEpub = () => {
-    if (!book?.epubBlob) return
-    
-    // Create a download link
-    const url = URL.createObjectURL(book.epubBlob)
+  const handleDownloadOriginal = () => {
+    if (!originalFile) return
+
+    const sourceType = book.sourceType ?? (originalFile.type === 'application/pdf' ? 'pdf' : 'epub')
+    const extension = sourceType === 'pdf' ? 'pdf' : sourceType === 'text' ? 'txt' : sourceType === 'web' ? 'html' : 'epub'
+
+    const url = URL.createObjectURL(originalFile)
     const a = document.createElement('a')
     a.href = url
-    // Sanitize filename
-    const filename = `${book.title.replace(/[^a-z0-9]/gi, '_')}.epub`
+    // Sanitize filename while preserving the source format.
+    const filename = `${book.title.replace(/[^a-z0-9]/gi, '_')}.${extension}`
     a.download = filename
     document.body.appendChild(a)
     a.click()
@@ -135,12 +139,12 @@ export function BookDetailPage() {
           <ChevronLeftIcon className="h-6 w-6" />
         </button>
         <span className="flex-1" />
-        {book.epubBlob && (
+        {originalFile && (
           <button
-            onClick={handleDownloadEpub}
+            onClick={handleDownloadOriginal}
             className="pressable flex h-10 w-10 items-center justify-center rounded-full text-text-secondary hover:bg-surface-2 hover:text-accent"
-            aria-label={t`Download EPUB`}
-            title={t`Download original EPUB`}
+            aria-label={t`Download original file`}
+            title={t`Download original file`}
           >
             <DownloadIcon className="h-5 w-5" />
           </button>
