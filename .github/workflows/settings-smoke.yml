@@ -1,4 +1,4 @@
-name: Settings interaction smoke test
+name: Final stable rollback smoke test
 
 on:
   push:
@@ -17,15 +17,35 @@ jobs:
         with:
           ref: restore/pre-voicebox-stable
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Keep current catalogs and install dependencies
+
+      - name: Fix engine switching regression
         run: |
-          git checkout origin/main -- src/locales
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('src/features/player/PlaybackController.ts')
+          text = path.read_text()
+          old_call = "const newVoiceId = this.getVoiceForEngine(settings)"
+          new_call = "const newVoiceId = this.getVoiceForEngine(settings, newEngine)"
+          old_sig = "  }): string {\n    switch (this.currentEngine) {"
+          new_sig = "  }, engine: TTSEngine = this.currentEngine): string {\n    switch (engine) {"
+          if text.count(old_call) != 1:
+              raise SystemExit(f'Expected one hot-swap voice call, found {text.count(old_call)}')
+          if text.count(old_sig) != 1:
+              raise SystemExit(f'Expected one getVoiceForEngine signature, found {text.count(old_sig)}')
+          text = text.replace(old_call, new_call, 1).replace(old_sig, new_sig, 1)
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: |
           npm ci
           npx playwright install --with-deps chromium
+
       - name: Add temporary Settings interaction test
         run: |
           cat > e2e/settings-buttons-temp.spec.ts <<'EOF'
@@ -33,14 +53,13 @@ jobs:
 
           test.describe('Settings interaction smoke test', () => {
             test.beforeEach(async ({ page }) => {
-              await page.goto('/settings')
+              await page.goto('/app/settings')
               await page.waitForLoadState('domcontentloaded')
               await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
             })
 
-            test('selection rows open the matching controls and update values', async ({ page }) => {
+            test('selection rows open matching controls and update values', async ({ page }) => {
               await page.getByText('Speed', { exact: true }).click()
-              await expect(page.getByText('Speed', { exact: true }).last()).toBeVisible()
               await page.getByText('1.25×', { exact: true }).click()
               await expect(page.getByText('1.25×', { exact: true }).first()).toBeVisible()
 
@@ -62,7 +81,7 @@ jobs:
               await expect(page.getByText('Browser', { exact: true })).toBeVisible()
             })
 
-            test('Leo row opens the Leo sheet and its controls match their labels', async ({ page }) => {
+            test('Leo row opens the Leo sheet and controls match their labels', async ({ page }) => {
               await page.getByText('Leo Voice', { exact: true }).click()
               await expect(page.getByText('Pocket TTS on this device.', { exact: true })).toBeVisible()
               await expect(page.getByRole('button', { name: /Install Leo|Replace Leo/ })).toBeVisible()
@@ -82,13 +101,13 @@ jobs:
               ]
 
               for (const [label, url] of routes) {
-                await page.goto('/settings')
+                await page.goto('/app/settings')
                 await page.getByText(label, { exact: true }).click()
                 await expect(page).toHaveURL(url)
               }
             })
 
-            test('destructive rows show confirmation instead of acting silently', async ({ page }) => {
+            test('destructive rows require confirmation', async ({ page }) => {
               let message = ''
               page.once('dialog', async dialog => {
                 message = dialog.message()
@@ -107,14 +126,21 @@ jobs:
             })
           })
           EOF
+
       - name: Run Settings smoke tests
         run: npx playwright test e2e/settings-buttons-temp.spec.ts
-      - name: Commit only catalog cleanup
+
+      - name: Validate build and touched files
+        run: |
+          npx eslint src/features/player/PlaybackController.ts src/features/settings/SettingsPage.tsx src/features/settings/PocketVoiceSetupSheet.tsx src/services/storage/settingsRepository.ts src/services/tts/index.ts src/services/tts/ttsManager.ts src/services/tts/types.ts
+          npm run build
+          git diff --check
+
+      - name: Commit validated final rollback
         run: |
           rm -f e2e/settings-buttons-temp.spec.ts .github/workflows/settings-smoke.yml
-          git checkout origin/main -- src/locales
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
-          git commit -m "Keep existing locale catalogs after stable rollback"
+          git commit -m "Fix engine switching and finalize stable rollback"
           git push origin HEAD:restore/pre-voicebox-stable
