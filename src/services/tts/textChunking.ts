@@ -1,16 +1,75 @@
 /**
  * Text chunking utilities for TTS generation.
  *
- * Splits text into chunks that respect sentence boundaries.
- * Never splits mid-sentence — a long sentence stays whole.
+ * Splits text into chunks that respect sentence boundaries by default. Engines
+ * with stricter latency/memory limits can opt into safe long-sentence splitting.
  */
+
+export interface ChunkingOptions {
+  /**
+   * When true, a single sentence that exceeds maxChars is split at a nearby
+   * clause/word boundary instead of being allowed to grow without bound.
+   */
+  splitLongSentences?: boolean
+}
+
+/**
+ * Split an oversized sentence without cutting through normal words.
+ * Prefer punctuation/clause boundaries in the latter half of the window, then
+ * fall back to whitespace. A pathological >limit token is hard-split only as a
+ * final fallback so the caller still gets a real maximum.
+ */
+function splitOversizedSentence(sentence: string, limit: number): string[] {
+  const pieces: string[] = []
+  let remaining = sentence.trim()
+
+  while (remaining.length > limit) {
+    const minNaturalCut = Math.max(1, Math.floor(limit * 0.55))
+    let cut = -1
+
+    // Prefer a clause boundary close to the limit. Keep punctuation attached to
+    // the phrase before the split so prosody remains as natural as possible.
+    for (let i = Math.min(limit, remaining.length - 1); i >= minNaturalCut; i--) {
+      if (/\s/.test(remaining[i]) && /[,;:—–-]/.test(remaining[i - 1] || '')) {
+        cut = i
+        break
+      }
+    }
+
+    // Otherwise split at the latest normal whitespace before the hard limit.
+    if (cut < 0) {
+      for (let i = Math.min(limit, remaining.length - 1); i >= 1; i--) {
+        if (/\s/.test(remaining[i])) {
+          cut = i
+          break
+        }
+      }
+    }
+
+    // Extremely long unbroken token/URL: enforce the limit rather than creating
+    // an arbitrarily large TTS request.
+    if (cut < 1) cut = limit
+
+    const piece = remaining.slice(0, cut).trim()
+    if (piece) pieces.push(piece)
+    remaining = remaining.slice(cut).trim()
+  }
+
+  if (remaining) pieces.push(remaining)
+  return pieces
+}
 
 /**
  * Split text into chunks at sentence boundaries.
  * - Combines sentences until hitting the character limit
- * - Never splits a sentence mid-way (even if it exceeds the limit)
+ * - By default, preserves a sentence even if it exceeds the limit
+ * - With splitLongSentences, oversized sentences are safely bounded
  */
-export function splitTextIntoChunks(text: string, maxChars: number): string[] {
+export function splitTextIntoChunks(
+  text: string,
+  maxChars: number,
+  options: ChunkingOptions = {},
+): string[] {
   const limit = Number.isFinite(maxChars) ? Math.max(100, Math.floor(maxChars)) : 500
 
   // Normalize whitespace. Also repair the specific legacy EPUB-import artifact
@@ -23,29 +82,31 @@ export function splitTextIntoChunks(text: string, maxChars: number): string[] {
     .trim()
   if (!normalized) return []
 
-  // Split into sentences
+  // Split into sentences. Pocket and other constrained engines may additionally
+  // break a rare oversized sentence at a natural clause/word boundary.
   const sentences = splitIntoSentences(normalized)
   if (sentences.length === 0) return []
+  const units = options.splitLongSentences
+    ? sentences.flatMap((sentence) =>
+        sentence.length > limit ? splitOversizedSentence(sentence, limit) : [sentence]
+      )
+    : sentences
 
-  // Combine sentences into chunks, respecting the limit
+  // Combine sentences/units into chunks, respecting the limit.
   const chunks: string[] = []
   let current = ''
 
-  for (const sentence of sentences) {
+  for (const sentence of units) {
     if (!current) {
-      // First sentence in chunk
       current = sentence
     } else if (current.length + 1 + sentence.length <= limit) {
-      // Can fit this sentence in current chunk
       current += ' ' + sentence
     } else {
-      // Current chunk is full, start a new one
       chunks.push(current)
       current = sentence
     }
   }
 
-  // Don't forget the last chunk
   if (current) {
     chunks.push(current)
   }
@@ -106,4 +167,3 @@ function splitIntoSentences(text: string): string[] {
 
   return sentences
 }
-
