@@ -11,7 +11,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Pocket is CPU-first. Install PyTorch from the CPU index explicitly so Linux
+# hosting does not pull several gigabytes of unused CUDA runtime packages.
+RUN pip install --upgrade pip \
+    && pip install torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install -r requirements.txt
 
 COPY app.py ./
 
