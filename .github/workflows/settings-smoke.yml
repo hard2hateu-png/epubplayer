@@ -78,20 +78,17 @@ jobs:
               await page.getByText('Voice Engine', { exact: true }).click()
               await expect(page.getByRole('option', { name: /Browser/ })).toBeVisible()
               await page.getByRole('option', { name: /Browser/ }).click()
-              await expect(page.getByRole('button', { name: /Voice Engine Browser/ })).toBeVisible()
+              const engineRow = page.getByRole('button').filter({ hasText: 'Voice Engine' })
+              await expect(engineRow).toContainText('Browser')
             })
 
             test('Leo setup exposes only actions that are currently valid', async ({ page }) => {
               await page.getByText('Leo Voice', { exact: true }).click()
               await expect(page.getByText('Pocket TTS on this device.', { exact: true })).toBeVisible()
-
-              // A fresh browser has no private Leo reference. The sheet should offer
-              // installation, not a misleading Use/Remove action that cannot work yet.
               await expect(page.getByText('Install Leo', { exact: true })).toBeVisible()
               await expect(page.locator('input[type="file"][accept*="audio"]')).toHaveCount(1)
               await expect(page.getByRole('button', { name: /Use Leo for TTS/ })).toHaveCount(0)
               await expect(page.getByRole('button', { name: /Remove Leo/ })).toHaveCount(0)
-
               await page.getByRole('button', { name: 'Done' }).click()
               await expect(page.getByText('Leo Voice', { exact: true })).toBeVisible()
             })
@@ -105,7 +102,6 @@ jobs:
                 ['Help', /\/app\/help/],
                 ['Terms & Privacy', /\/app\/terms/],
               ]
-
               for (const [label, url] of routes) {
                 await page.goto('/app/settings')
                 await page.getByText(label, { exact: true }).click()
