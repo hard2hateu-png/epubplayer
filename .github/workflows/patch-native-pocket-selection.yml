@@ -25,58 +25,23 @@ jobs:
 
           path = Path('src/features/settings/SettingsPage.tsx')
           text = path.read_text()
+          needle = "          } else if (engine === 'pocket') {\n"
+          guard = (
+              needle
+              + "            // Keep the current working engine until native Leo is actually ready.\n"
+              + "            const hasLeo = await pocketService.hasLeoVoiceSample()\n"
+              + "            if (!hasLeo) {\n"
+              + "              setActiveSheet('pocketLeo')\n"
+              + "              return\n"
+              + "            }\n"
+          )
 
-          old = """          } else if (engine === 'pocket') {
-            // Unique cache identity for Leo. Pocket itself always uses the local Leo clone.
-            await settingsRepository.set('voiceId', 'pocket:leo')
-            setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
-          }
+          if guard in text:
+              raise SystemExit('Pocket install guard already present; refusing duplicate insertion.')
+          if needle not in text:
+              raise SystemExit('Pocket engine-selection block was not found; refusing to patch.')
 
-          // PlaybackController currently resolves the outgoing engine's voice during a hot-swap.
-          // A one-time page reload when switching to/from Pocket avoids a transient wrong cache key
-          // without changing the stable playback controller used by the existing engines.
-          const switchingToOrFromPocket = engine === 'pocket' || settings.ttsEngine === 'pocket'
-          if (switchingToOrFromPocket) {
-            await settingsRepository.set('ttsEngine', engine)
-            setSettings((prev) => ({ ...prev, ttsEngine: engine }))
-            setActiveSheet(null)
-            ttsManager.destroy()
-            window.location.reload()
-            return
-          }
-          """
-
-          new = """          } else if (engine === 'pocket') {
-            // Do not switch the reader into Pocket until Leo actually exists.
-            // This keeps the currently working engine active while the setup sheet
-            // handles the one-time reference upload and native voice preparation.
-            const hasLeo = await pocketService.hasLeoVoiceSample()
-            if (!hasLeo) {
-              setActiveSheet('pocketLeo')
-              return
-            }
-
-            await settingsRepository.set('voiceId', 'pocket:leo')
-            setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
-          }
-
-          // PlaybackController currently resolves the outgoing engine's voice during a hot-swap.
-          // Reload only after Pocket has a valid Leo voice, or when leaving Pocket.
-          const switchingToOrFromPocket = engine === 'pocket' || settings.ttsEngine === 'pocket'
-          if (switchingToOrFromPocket) {
-            await settingsRepository.set('ttsEngine', engine)
-            setSettings((prev) => ({ ...prev, ttsEngine: engine }))
-            setActiveSheet(null)
-            ttsManager.destroy()
-            window.location.reload()
-            return
-          }
-          """
-
-          if old not in text:
-            raise SystemExit('Expected Pocket engine-selection block was not found; refusing to patch.')
-
-          path.write_text(text.replace(old, new, 1))
+          path.write_text(text.replace(needle, guard, 1))
           PY
 
       - name: Commit patch
