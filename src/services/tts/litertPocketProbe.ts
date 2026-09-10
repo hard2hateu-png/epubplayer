@@ -10,18 +10,26 @@ export interface LiteRTPocketProbeResult {
 
 export type LiteRTPocketProbeStatus = (stage: string, detail?: string) => void
 
-type WorkerMessage =
+type GeneratorMessage =
+  | { type: 'status'; stage: string; detail?: string }
+  | {
+      type: 'latent-result'
+      latents: Float32Array
+      latentFrames: number
+      generationMs: number
+      text: string
+    }
+  | { type: 'error'; error: string }
+
+type DecoderMessage =
   | { type: 'status'; stage: string; detail?: string }
   | {
       type: 'result'
       pcm: Float32Array
       sampleRate: number
-      text: string
       duration: number
-      generationMs: number
       decodeMs: number
-      totalMs: number
-      rtfx: number
+      workerMs: number
     }
   | { type: 'error'; error: string }
 
@@ -55,65 +63,128 @@ function pcmToWav(pcm: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
+function makeClassicWorker(url: URL, name: string): Worker {
+  // LiteRT's WASM bootstrap uses importScripts(), so these must remain classic workers.
+  return new Worker(url, { name })
+}
+
 export function runLiteRTPocketProbe(
   onStatus?: LiteRTPocketProbeStatus,
 ): Promise<LiteRTPocketProbeResult> {
   return new Promise((resolve, reject) => {
-    // LiteRT's WASM bootstrap calls importScripts() when it runs inside a worker.
-    // importScripts() is illegal in module workers, so this probe must stay a
-    // classic worker. Vite bundles the worker as an IIFE via vite.config.ts.
-    const worker = new Worker(
-      new URL('./litertPocketProbe.worker.ts', import.meta.url),
-      { name: 'pocket-litert-alba-probe' },
-    )
+    const totalStarted = performance.now()
+    let generator: Worker | null = null
+    let decoder: Worker | null = null
+    let releaseTimer: number | null = null
     let settled = false
+    let generationMs = 0
+    let sampleText = ''
+
     const timeout = window.setTimeout(() => {
       if (settled) return
       settled = true
-      worker.terminate()
+      generator?.terminate()
+      decoder?.terminate()
+      if (releaseTimer != null) window.clearTimeout(releaseTimer)
       reject(new Error('Pocket LiteRT test timed out after 5 minutes.'))
     }, 5 * 60 * 1000)
 
     const finish = () => {
       window.clearTimeout(timeout)
-      worker.terminate()
+      if (releaseTimer != null) window.clearTimeout(releaseTimer)
+      generator?.terminate()
+      decoder?.terminate()
+      generator = null
+      decoder = null
     }
 
-    worker.onerror = (event) => {
+    const fail = (message: string) => {
       if (settled) return
       settled = true
       finish()
-      reject(new Error(event.message || 'Pocket LiteRT worker crashed.'))
+      reject(new Error(message))
     }
 
-    worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+    const startDecoder = (latents: Float32Array, latentFrames: number) => {
+      onStatus?.('Pocket language model fully released.', 'Starting decoder in a fresh worker…')
+      decoder = makeClassicWorker(
+        new URL('./litertPocketDecode.worker.ts', import.meta.url),
+        'pocket-litert-alba-decoder',
+      )
+
+      decoder.onerror = (event) => {
+        fail(event.message || 'Pocket LiteRT decoder worker crashed.')
+      }
+
+      decoder.onmessage = (event: MessageEvent<DecoderMessage>) => {
+        const message = event.data
+        if (message.type === 'status') {
+          onStatus?.(message.stage, message.detail)
+          return
+        }
+        if (message.type === 'error') {
+          fail(message.error)
+          return
+        }
+        if (settled) return
+        settled = true
+        const totalMs = performance.now() - totalStarted
+        const result = {
+          blob: pcmToWav(message.pcm, message.sampleRate),
+          text: sampleText,
+          duration: message.duration,
+          generationMs,
+          decodeMs: message.decodeMs,
+          totalMs,
+          rtfx: message.duration / Math.max(0.001, generationMs / 1000),
+        }
+        finish()
+        resolve(result)
+      }
+
+      decoder.postMessage(
+        { type: 'decode', latents, latentFrames },
+        [latents.buffer],
+      )
+    }
+
+    generator = makeClassicWorker(
+      new URL('./litertPocketProbe.worker.ts', import.meta.url),
+      'pocket-litert-alba-generator',
+    )
+
+    generator.onerror = (event) => {
+      fail(event.message || 'Pocket LiteRT generation worker crashed.')
+    }
+
+    generator.onmessage = (event: MessageEvent<GeneratorMessage>) => {
       const message = event.data
       if (message.type === 'status') {
         onStatus?.(message.stage, message.detail)
         return
       }
-      if (settled) return
       if (message.type === 'error') {
-        settled = true
-        finish()
-        reject(new Error(message.error))
+        fail(message.error)
         return
       }
-      if (message.type === 'result') {
-        settled = true
-        finish()
-        resolve({
-          blob: pcmToWav(message.pcm, message.sampleRate),
-          text: message.text,
-          duration: message.duration,
-          generationMs: message.generationMs,
-          decodeMs: message.decodeMs,
-          totalMs: message.totalMs,
-          rtfx: message.rtfx,
-        })
-      }
+      if (message.type !== 'latent-result' || settled) return
+
+      generationMs = message.generationMs
+      sampleText = message.text
+      const latents = message.latents
+      const latentFrames = message.latentFrames
+
+      // Hard-stop the large flow-LM worker before creating any decoder runtime.
+      generator.terminate()
+      generator = null
+      onStatus?.('Releasing Pocket GPU memory…', 'The decoder will start separately in about 1.5 seconds.')
+
+      releaseTimer = window.setTimeout(() => {
+        releaseTimer = null
+        if (!settled) startDecoder(latents, latentFrames)
+      }, 1500)
     }
 
-    worker.postMessage({ type: 'run' })
+    generator.postMessage({ type: 'generate-only' })
   })
 }
