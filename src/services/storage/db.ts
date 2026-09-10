@@ -4,14 +4,18 @@ import Dexie, { type EntityTable } from 'dexie'
 // Type definitions for all stored entities
 // ============================================================================
 
+export type ContentSourceType = 'epub' | 'pdf' | 'web' | 'text'
+
 export interface Book {
   id: string
   title: string
   author: string
   coverBlob?: Blob
   coverUrl?: string // Object URL, generated at runtime
-  epubBlob?: Blob // Original EPUB file for export/download
-  contentHash?: string // SHA-256 hash of EPUB content for deduplication
+  sourceType?: ContentSourceType
+  epubBlob?: Blob // Original EPUB file only (legacy PDFs are migrated on read)
+  originalBlob?: Blob // Original non-EPUB source file, e.g. PDF
+  contentHash?: string // SHA-256 hash of imported content for deduplication
   language?: string
   publisher?: string
   description?: string
@@ -153,7 +157,7 @@ export async function hashText(text: string): Promise<string> {
 }
 
 /**
- * Generate a hash for a Blob (for EPUB deduplication)
+ * Generate a hash for a Blob (for import deduplication)
  * Uses SHA-256 and returns first 16 hex chars for a good balance of uniqueness and brevity
  */
 export async function hashBlob(blob: Blob): Promise<string> {
