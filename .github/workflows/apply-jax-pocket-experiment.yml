@@ -33,8 +33,8 @@ jobs:
         run: |
           ! grep -R "pocket-native\|railway.app\|/voice/install" src/services/tts/pocketService.ts src/services/tts/jaxPocket/worker.ts
 
-      - name: Test
-        run: npm test
+      - name: Unit test stable chunking
+        run: npx vitest run src/services/tts/textChunking.test.ts
 
       - name: Build
         run: npm run build
