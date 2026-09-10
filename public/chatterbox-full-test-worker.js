@@ -14,8 +14,8 @@ let processor = null
 let speaker = null
 let busy = false
 
-function post(type, data = {}) {
-  self.postMessage({ type, data })
+function post(type, data = {}, transfer = []) {
+  self.postMessage({ type, data }, transfer)
 }
 
 function errorText(error) {
