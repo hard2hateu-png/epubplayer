@@ -48,6 +48,18 @@ function estimateDuration(text: string): number {
   return Math.max(1, text.length / 13)
 }
 
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
+// Pocket's autoregressive browser runtime is much smoother with short requests.
+// Keep these aligned with PocketService's own safety limits.
+const POCKET_IOS_MAX_CHARS = 150
+const POCKET_MAX_CHARS = 220
+
 // ============================================================================
 // Chunk Manager
 // ============================================================================
@@ -66,10 +78,17 @@ export class ChunkManager {
     // Clear existing chunks for this section
     this.chunks = this.chunks.filter((c) => c.sectionIndex !== sectionIndex)
 
-    // Split into chunks using a pure chunking function + current settings.
-    // IMPORTANT: do not depend on TTS initialization state (prevents cache/key mismatches).
-    const maxChunkChars = await settingsRepository.get('maxChunkChars')
-    const textChunks = splitTextIntoChunks(text, maxChunkChars)
+    // Split into chunks using current settings. Pocket needs substantially
+    // smaller requests on iPhone; other engines keep their existing chunk size.
+    const settings = await settingsRepository.getAll()
+    const isPocket = settings.ttsEngine === 'pocket'
+    const pocketLimit = isIOSDevice() ? POCKET_IOS_MAX_CHARS : POCKET_MAX_CHARS
+    const maxChunkChars = isPocket
+      ? Math.min(settings.maxChunkChars, pocketLimit)
+      : settings.maxChunkChars
+    const textChunks = splitTextIntoChunks(text, maxChunkChars, {
+      splitLongSentences: isPocket,
+    })
 
     // Record where each unchanged chunk begins in the normalized section text.
     // This is UI metadata only; the text passed to TTS is byte-for-byte the same.
@@ -159,7 +178,6 @@ export class ChunkManager {
    */
   getPreviousPosition(current: ChunkPosition): ChunkPosition | null {
     if (current.chunkIndex > 0) {
-      // Previous chunk in same section
       return {
         sectionIndex: current.sectionIndex,
         chunkIndex: current.chunkIndex - 1,
@@ -167,7 +185,6 @@ export class ChunkManager {
     }
 
     if (current.sectionIndex > 0) {
-      // Last chunk of previous section
       const prevSectionChunks = this.getSectionChunkCount(current.sectionIndex - 1)
       return {
         sectionIndex: current.sectionIndex - 1,
@@ -175,7 +192,6 @@ export class ChunkManager {
       }
     }
 
-    // Beginning of book
     return null
   }
 
@@ -240,32 +256,24 @@ export class ChunkManager {
     return result
   }
 
-  /**
-   * Clear all chunks
-   */
+  /** Clear all chunks */
   clear(): void {
     this.chunks = []
     this.sectionTexts.clear()
   }
 
-  /**
-   * Clear chunks for a specific section
-   */
+  /** Clear chunks for a specific section */
   clearSection(sectionIndex: number): void {
     this.chunks = this.chunks.filter((c) => c.sectionIndex !== sectionIndex)
     this.sectionTexts.delete(sectionIndex)
   }
 
-  /**
-   * Get raw text for a section
-   */
+  /** Get raw text for a section */
   getSectionText(sectionIndex: number): string | undefined {
     return this.sectionTexts.get(sectionIndex)
   }
 
-  /**
-   * Check if section is loaded
-   */
+  /** Check if section is loaded */
   isSectionLoaded(sectionIndex: number): boolean {
     return this.sectionTexts.has(sectionIndex)
   }
@@ -273,10 +281,6 @@ export class ChunkManager {
   /**
    * Convert a section time (in seconds) to a chunk position.
    * This is the inverse of getSectionProgress - used for seeking from lock screen.
-   * 
-   * @param sectionIndex - Section to seek within
-   * @param targetTime - Target time in seconds from section start
-   * @returns Chunk position and time offset within that chunk, or null if invalid
    */
   getChunkPositionFromTime(
     sectionIndex: number,
@@ -288,16 +292,13 @@ export class ChunkManager {
       return null
     }
 
-    // Calculate estimated durations for all chunks
     const estimatedDurations = sectionChunks.map(c => estimateDuration(c.text))
     
-    // Find which chunk contains the target time
     let accumulatedTime = 0
     for (let i = 0; i < sectionChunks.length; i++) {
       const chunkDuration = estimatedDurations[i]
       
       if (accumulatedTime + chunkDuration >= targetTime) {
-        // Found the chunk - calculate time offset within it
         const timeInChunk = Math.max(0, targetTime - accumulatedTime)
         return {
           chunkIndex: i,
@@ -308,7 +309,6 @@ export class ChunkManager {
       accumulatedTime += chunkDuration
     }
     
-    // Target time exceeds section duration - return last chunk at its end
     const lastIndex = sectionChunks.length - 1
     return {
       chunkIndex: lastIndex,
@@ -319,10 +319,6 @@ export class ChunkManager {
   /**
    * Calculate section-level progress for Media Session lock screen display.
    * Uses text length estimates to provide smooth progress that doesn't reset every chunk.
-   * 
-   * @param position - Current chunk position
-   * @param currentChunkTime - Current playback time within the chunk (seconds)
-   * @param currentChunkDuration - Actual duration of the current chunk (seconds), if known
    */
   getSectionProgress(
     position: ChunkPosition,
@@ -335,27 +331,20 @@ export class ChunkManager {
       return { position: 0, duration: 0, percent: 0 }
     }
 
-    // Calculate estimated durations for all chunks
     const estimatedDurations = sectionChunks.map(c => estimateDuration(c.text))
     const totalDuration = estimatedDurations.reduce((sum, d) => sum + d, 0)
 
-    // Calculate position: sum of completed chunks + current position in current chunk
     let completedDuration = 0
     for (let i = 0; i < position.chunkIndex; i++) {
       completedDuration += estimatedDurations[i] ?? 0
     }
 
-    // For the current chunk, use actual duration if available, otherwise estimate
     const currentChunkEstimate = estimatedDurations[position.chunkIndex] ?? 0
     const actualChunkDuration = currentChunkDuration ?? currentChunkEstimate
     
-    // Scale the current time proportionally if actual duration differs from estimate
-    // This ensures smooth progress even when actual != estimated
     let scaledCurrentTime = currentChunkTime
     if (actualChunkDuration > 0 && currentChunkEstimate > 0) {
-      // What fraction through the current chunk are we?
       const chunkProgress = currentChunkTime / actualChunkDuration
-      // Apply that fraction to the estimated duration for consistent section progress
       scaledCurrentTime = chunkProgress * currentChunkEstimate
     }
 
@@ -370,6 +359,4 @@ export class ChunkManager {
   }
 }
 
-// Singleton instance
 export const chunkManager = new ChunkManager()
-

@@ -58,10 +58,11 @@ function isIOSDevice(): boolean {
 }
 
 // Neural TTS + large IndexedDB audio caches can put iOS WebKit under severe
-// memory pressure. A couple minutes of look-ahead is plenty for seamless 1.5x
-// playback without continuously generating a whole chapter in the background.
+// memory pressure. Pocket now uses ~150-char chunks on iPhone, so four target
+// chunks (current + three ahead) keeps roughly the same text/audio footprint as
+// the older two much-larger chunks while giving playback a deeper safety buffer.
 const IOS_MAX_BUFFER_CHUNKS = 12
-const IOS_POCKET_MAX_BUFFER_CHUNKS = 2
+const IOS_POCKET_MAX_BUFFER_CHUNKS = 4
 
 function getIOSBufferLimit(engine?: TTSEngine): number {
   return engine === 'pocket' ? IOS_POCKET_MAX_BUFFER_CHUNKS : IOS_MAX_BUFFER_CHUNKS
@@ -506,9 +507,10 @@ export class TTSBufferManager {
           this.lastError = null
           void this.updateBufferIndicator()
 
-          // Give iOS a small breather between neural generations so WebKit has
-          // time to release temporary inference/audio allocations.
-          const iOSBreather = isIOSDevice() ? (this.ctx?.engine === 'pocket' ? 500 : 40) : 0
+          // Pocket's smaller requests release less temporary audio/inference data,
+          // so a 250 ms breather is still conservative while letting the queue
+          // refill materially faster than the old 500 ms pause after every chunk.
+          const iOSBreather = isIOSDevice() ? (this.ctx?.engine === 'pocket' ? 250 : 40) : 0
           await this.waitForWakeOrTimeout(iOSBreather)
         } catch (e) {
           if (isAbortError(e)) {
@@ -577,5 +579,3 @@ export class TTSBufferManager {
 }
 
 export const ttsBufferManager = new TTSBufferManager()
-
-
