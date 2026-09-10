@@ -63,11 +63,6 @@ function pcmToWav(pcm: Float32Array, sampleRate: number): Blob {
   return new Blob([buffer], { type: 'audio/wav' })
 }
 
-function makeClassicWorker(url: URL, name: string): Worker {
-  // LiteRT's WASM bootstrap uses importScripts(), so these must remain classic workers.
-  return new Worker(url, { name })
-}
-
 export function runLiteRTPocketProbe(
   onStatus?: LiteRTPocketProbeStatus,
 ): Promise<LiteRTPocketProbeResult> {
@@ -107,9 +102,12 @@ export function runLiteRTPocketProbe(
 
     const startDecoder = (latents: Float32Array, latentFrames: number) => {
       onStatus?.('Pocket language model fully released.', 'Starting decoder in a fresh worker…')
-      decoder = makeClassicWorker(
+
+      // Keep this constructor inline. Vite only recognizes and bundles worker
+      // entrypoints when new Worker(new URL(..., import.meta.url)) is statically visible.
+      decoder = new Worker(
         new URL('./litertPocketDecode.worker.ts', import.meta.url),
-        'pocket-litert-alba-decoder',
+        { name: 'pocket-litert-alba-decoder' },
       )
 
       decoder.onerror = (event) => {
@@ -148,9 +146,11 @@ export function runLiteRTPocketProbe(
       )
     }
 
-    const generationWorker = makeClassicWorker(
+    // Keep this constructor inline for Vite's worker transform. Wrapping it in a
+    // helper caused production to request a raw .ts file on Safari.
+    const generationWorker = new Worker(
       new URL('./litertPocketProbe.worker.ts', import.meta.url),
-      'pocket-litert-alba-generator',
+      { name: 'pocket-litert-alba-generator' },
     )
     generator = generationWorker
 
