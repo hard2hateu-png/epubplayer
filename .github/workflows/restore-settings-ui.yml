@@ -1,0 +1,225 @@
+name: Restore Settings UI
+
+on:
+  push:
+    branches:
+      - fix/restore-settings-ui
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/restore-settings-ui
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Restore original Settings presentation
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/features/settings/SettingsPage.tsx')
+          s = path.read_text()
+
+          def sub(pattern, replacement, *, count=1, flags=0, label='replacement'):
+              global s
+              s2, n = re.subn(pattern, replacement, s, count=count, flags=flags)
+              if n != count:
+                  raise SystemExit(f'{label}: expected {count} match(es), found {n}')
+              s = s2
+
+          sub(
+              r"function getTTSEngines\(\) \{.*?\n\}\n\n// Kokoro voice options",
+              """function getTTSEngines() {
+            return [
+              { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
+              { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
+              { id: 'pocket' as TTSEngine, name: t`Pocket TTS`, description: t`Custom on-device voice.` },
+              { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
+              { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
+              { id: 'kitten' as TTSEngine, name: t`Kitten (Light)`, description: t`Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download.` },
+              { id: 'piper' as TTSEngine, name: t`Piper (Experimental)`, description: t`⚠️ Under development - may not work yet.` },
+            ]
+          }
+
+          // Kokoro voice options""",
+              flags=re.S,
+              label='engine list',
+          )
+
+          sub(
+              r"function getModelConfigs\(\) \{.*?\n\}",
+              """function getModelConfigs() {
+            return [
+              { id: 'q4', name: t`Fast (q4)`, description: t`Fastest, smallest (WASM only)` },
+              { id: 'q8', name: t`Balanced (q8)`, description: t`Good balance (WASM only)` },
+              { id: 'fp16', name: t`High (fp16)`, description: t`Higher quality (WASM only)` },
+              { id: 'fp32', name: t`Full (fp32)`, description: t`Best quality, required for WebGPU` },
+            ]
+          }""",
+              flags=re.S,
+              label='model config wording',
+          )
+
+          sub(
+              r"function getProcessingDevices\(\) \{.*?\n\}",
+              """function getProcessingDevices() {
+            return [
+              { id: 'auto', name: t`Auto`, description: t`Use WebGPU if available, otherwise CPU (WASM)` },
+              { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Fast but uses fp32 model (~80MB)` },
+              { id: 'wasm', name: t`CPU (WASM)`, description: t`Slow but supports smaller quantized models` },
+            ]
+          }""",
+              flags=re.S,
+              label='processing device wording',
+          )
+
+          sub(
+              r"function getSupertonicDevices\(\) \{.*?\n\}",
+              """function getSupertonicDevices() {
+            return [
+              { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Best performance — fast and smooth playback` },
+              { id: 'wasm', name: t`CPU (WASM)`, description: t`Fallback if WebGPU is unavailable` },
+            ]
+          }""",
+              flags=re.S,
+              label='Supertonic device wording',
+          )
+
+          sub(
+              r"function isIOSDevice\(\): boolean \{.*?\n\}\n\nfunction getBufferAheadChoices\(\) \{.*?\n\}",
+              """function getBufferAheadChoices() {
+            return [
+              { id: 'minutes:3', label: t`3 minutes`, description: t`Good balance (less storage)` },
+              { id: 'minutes:10', label: t`10 minutes`, description: t`Smoother playback` },
+              { id: 'minutes:30', label: t`30 minutes`, description: t`Very smooth, uses more storage` },
+              { id: 'chapter', label: t`Entire chapter`, description: t`Keep generating until the chapter is fully cached` },
+              { id: 'book', label: t`Entire book (∞)`, description: t`Maximum caching; may use lots of storage` },
+            ]
+          }""",
+              flags=re.S,
+              label='buffer choice wording',
+          )
+
+          sub(
+              r"  const getBufferAheadLabel = \(\) => \{.*?\n  \}",
+              """  const getBufferAheadLabel = () => {
+            if (settings.bufferAheadMode === 'chapter') return t`Entire chapter`
+            if (settings.bufferAheadMode === 'book') return t`Entire book (∞)`
+            return t`${settings.bufferAheadMinutes} min`
+          }""",
+              flags=re.S,
+              label='buffer label wording',
+          )
+
+          sub(
+              r"\n          \{settings\.ttsEngine !== 'pocket' && \(\n            <SettingsItem.*?\n          \)\}\n",
+              "\n",
+              flags=re.S,
+              label='standalone Leo row',
+          )
+
+          replacements = {
+              'label={t`Speed`}': 'label={t`Default Speed`}',
+              'label={t`Resume Rewind`}': 'label={t`Auto-rewind on Resume`}',
+              'label={t`Voice Engine`}': 'label={t`TTS Engine`}',
+              'description={t`Choose a voice engine`}': 'description={t`Choose speed vs quality`}',
+              'description={t`10 voices`}': 'description={t`10 high-quality AI voices`}',
+              'label={t`Processor`}': 'label={t`Processing Device`}',
+              'description={t`WebGPU or WASM`}': 'description={t`WebGPU is fastest; WASM is fallback for older devices`}',
+              'label={t`Preload Audio`}': 'label={t`Buffer Ahead`}',
+              'description={t`Generate upcoming audio`}': 'description={t`Keeps generating ahead even while paused`}',
+              'description={t`One model per voice`}': 'description={t`Each voice is a different neural model`}',
+              'description={t`900+ voices`}': 'description={t`900+ AI voices available`}',
+              'description={t`8 voices`}': 'description={t`8 lightweight AI voices`}',
+              'label={t`Quality`}': 'label={t`Model Quality`}',
+              'description={t`Used for CPU mode`}': 'description={t`WebGPU always uses fp32; quantized models are WASM-only`}',
+              'description={t`WebGPU is faster`}': 'description={t`WebGPU is fastest when supported`}',
+              'title={t`Voice Engine`}': 'title={t`TTS Engine`}',
+              'title={t`Voice`}': 'title={t`Select Voice`}',
+              'title={t`Piper Voice`}': 'title={t`Select Piper Voice`}',
+              'title={t`Supertonic Voice`}': 'title={t`Select Supertonic Voice`}',
+              'title={t`Supertonic Processor`}': 'title={t`Supertonic Processing Device`}',
+              'title={t`Sherpa Voice`}': 'title={t`Select Sherpa Voice`}',
+              'title={t`Kitten Voice`}': 'title={t`Select Kitten Voice`}',
+              'title={t`Quality`}': 'title={t`Model Quality`}',
+              'title={t`Processor`}': 'title={t`Processing Device`}',
+              'title={t`Speed`}': 'title={t`Default Speed`}',
+              'title={t`Skip Forward`}': 'title={t`Skip Forward Interval`}',
+              'title={t`Skip Back`}': 'title={t`Skip Back Interval`}',
+              'title={t`Resume Rewind`}': 'title={t`Auto-rewind on Resume`}',
+              'title={t`Preload Audio`}': 'title={t`Buffer Ahead`}',
+              'label={t`Active TTS`}': 'label={t`TTS Engine`}',
+              'description={t`View or copy logs`}': 'description={t`View/copy logs on mobile (including TTS worker)`}',
+              'description={t`Keyboard and screen reader`}': 'description={t`Keyboard shortcuts, screen reader support`}',
+              'label={t`Help`}': 'label={t`Help & How it works`}',
+              'description={t`Send books to another device`}': 'description={t`Send your books to another device`}',
+              'description={t`Delete generated audio`}': 'description={t`Remove all generated audio to free up space`}',
+              'description={t`Delete books, audio, and settings`}': 'description={t`Remove all books, audio, and settings`}',
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'missing expected text: {old}')
+              s = s.replace(old, new)
+
+          pocket_voice = '''                value="Leo"\n                description={pocketVoiceInstalled ? t`Pocket TTS` : t`Voice sample needed`}\n                onClick={() => setActiveSheet('pocketLeo')}'''
+          if pocket_voice not in s:
+              raise SystemExit('Pocket Voice row did not match expected source')
+          s = s.replace(
+              pocket_voice,
+              '''                value="Leo"\n                onClick={() => setActiveSheet('pocketLeo')}''',
+          )
+
+          state_old = '  const [pocketVoiceInstalled, setPocketVoiceInstalled] = useState<boolean | null>(null)'
+          if state_old not in s:
+              raise SystemExit('Pocket install state declaration not found')
+          s = s.replace(state_old, '  const [, setPocketVoiceInstalled] = useState<boolean | null>(null)')
+
+          storage_pattern = r'''              <div className="border-b border-border-muted px-4 py-4">\n                <div className="mb-3 flex items-center justify-between">\n                  <span className="text-text-primary">App storage used</span>.*?\n              </div>'''
+          storage_replacement = '''              <div className="border-b border-border-muted px-4 py-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-text-primary"><Trans>Storage Used</Trans></span>
+                  <span className="text-text-secondary">
+                    {stats.quotaUsedMB} MB / {stats.quotaTotalMB} MB
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-surface-3">
+                  <div
+                    className={`h-full transition-all ${
+                      stats.quotaPercentUsed > 80 ? 'bg-warning' : 'bg-accent'
+                    }`}
+                    style={{ width: `${Math.min(100, stats.quotaPercentUsed)}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-text-muted">
+                  <Trans>{stats.totalAudioSizeMB} MB audio • {stats.totalChunkCount} chunks • {stats.bookCount} books</Trans>
+                </div>
+              </div>'''
+          sub(storage_pattern, storage_replacement, flags=re.S, label='Storage Used block')
+
+          path.write_text(s)
+          PY
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Lint changed Settings file
+        run: npx eslint src/features/settings/SettingsPage.tsx
+      - name: Commit restored Settings UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/restore-settings-ui.yml
+          git add src/features/settings/SettingsPage.tsx
+          git add -u .github/workflows/restore-settings-ui.yml
+          git commit -m "Restore original Settings UI with Pocket TTS"
+          git push origin fix/restore-settings-ui
