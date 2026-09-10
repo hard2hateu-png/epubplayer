@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { pocketService, ttsManager } from '@/services/tts'
-import { settingsRepository } from '@/services/storage/settingsRepository'
+import { runLiteRTPocketProbe, type LiteRTPocketProbeResult } from '@/services/tts/litertPocketProbe'
 import { useFocusTrap } from '@/ui/accessibility'
 
 export function PocketVoiceSetupSheet({
@@ -12,136 +11,49 @@ export function PocketVoiceSetupSheet({
   onClose: () => void
   onInstalledChange?: (installed: boolean) => void
 }) {
-  const [installed, setInstalled] = useState(false)
-  const [active, setActive] = useState(false)
-  const [checking, setChecking] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [stage, setStage] = useState('')
+  const [detail, setDetail] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<LiteRTPocketProbeResult | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
 
   const sheetRef = useFocusTrap<HTMLDivElement>({
     isActive: isOpen,
-    onEscape: onClose,
+    onEscape: busy ? undefined : onClose,
   })
 
   useEffect(() => {
-    if (!isOpen) return
-    let cancelled = false
-    setChecking(true)
-    setMessage(null)
-    setError(null)
-
-    Promise.all([
-      pocketService.hasLeoVoiceSample(),
-      settingsRepository.get('ttsEngine'),
-    ])
-      .then(([hasReference, engine]) => {
-        if (cancelled) return
-        setInstalled(hasReference)
-        setActive(engine === 'pocket')
-        onInstalledChange?.(hasReference)
-      })
-      .catch(() => {
-        if (cancelled) return
-        setInstalled(false)
-        setActive(false)
-        onInstalledChange?.(false)
-      })
-      .finally(() => {
-        if (!cancelled) setChecking(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
+    if (isOpen) onInstalledChange?.(false)
   }, [isOpen, onInstalledChange])
+
+  useEffect(() => {
+    if (!result) return
+    const url = URL.createObjectURL(result.blob)
+    setAudioUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [result])
 
   if (!isOpen) return null
 
-  const activateLeo = async () => {
-    const hasReference = await pocketService.hasLeoVoiceSample()
-    if (!hasReference) {
-      setInstalled(false)
-      onInstalledChange?.(false)
-      throw new Error('Install the Leo reference before using Pocket TTS.')
-    }
-
-    // Pocket has one custom voice. Keep its engine + cache identity in sync so
-    // Settings, playback, and generated-audio caching all agree that Leo is active.
-    await settingsRepository.set('voiceId', 'pocket:leo')
-    await settingsRepository.set('ttsEngine', 'pocket')
-    setActive(true)
-    ttsManager.destroy()
-
-    // The settings page already renders Pocket-specific controls from ttsEngine.
-    // Reload once so Supertonic/Kokoro controls disappear immediately and Voice = Leo.
-    window.location.reload()
-  }
-
-  const handleUseLeo = async () => {
+  const runTest = async () => {
     setBusy(true)
-    setMessage(null)
     setError(null)
+    setResult(null)
+    setStage('Starting Pocket LiteRT…')
+    setDetail('Keep this screen open during the first test.')
     try {
-      await activateLeo()
+      const next = await runLiteRTPocketProbe((nextStage, nextDetail) => {
+        setStage(nextStage)
+        setDetail(nextDetail || '')
+      })
+      setResult(next)
+      setStage('Alba sample is ready.')
+      setDetail('Pocket was not activated and your current TTS engine was not changed.')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not activate Leo Voice.')
-      setBusy(false)
-    }
-  }
-
-  const handleFile = async (file: File | null) => {
-    if (!file) return
-    setBusy(true)
-    setMessage(null)
-    setError(null)
-
-    try {
-      await pocketService.installLeoVoiceSample(file)
-      setInstalled(true)
-      onInstalledChange?.(true)
-      setMessage(
-        'Preparing Leo. First setup can take a while.'
-      )
-      await pocketService.initialize()
-      setMessage('Leo is ready.')
-      await activateLeo()
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not install and prepare the Leo reference.'
-      )
-      setBusy(false)
-    }
-  }
-
-  const handleRemove = async () => {
-    setBusy(true)
-    setMessage(null)
-    setError(null)
-
-    try {
-      await pocketService.removeLeoVoiceSample()
-      setInstalled(false)
-      onInstalledChange?.(false)
-
-      // Never leave the app pointing at Pocket when its only voice was removed.
-      if (active) {
-        await settingsRepository.set('supertonicVoice', 'F1')
-        await settingsRepository.set('ttsEngine', 'supertonic')
-        ttsManager.destroy()
-        window.location.reload()
-        return
-      }
-
-      setMessage('Leo was removed from this device.')
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not remove the Leo voice reference.'
-      )
+      setError(err instanceof Error ? err.message : 'Pocket LiteRT test failed.')
+      setStage('LiteRT test stopped.')
+      setDetail('Your current TTS engine is still unchanged.')
     } finally {
       setBusy(false)
     }
@@ -159,8 +71,8 @@ export function PocketVoiceSetupSheet({
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="pocket-leo-setup-title"
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[78vh] overflow-y-auto rounded-t-2xl bg-surface-1 shadow-2xl md:inset-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
+        aria-labelledby="pocket-litert-test-title"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-2xl bg-surface-1 shadow-2xl md:inset-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
       >
         <div className="flex justify-center py-3 md:hidden" aria-hidden="true">
           <div className="h-1 w-10 rounded-full bg-surface-4" />
@@ -168,14 +80,11 @@ export function PocketVoiceSetupSheet({
 
         <div className="flex items-start justify-between gap-4 border-b border-border-muted px-5 pb-4 md:pt-5">
           <div>
-            <h3
-              id="pocket-leo-setup-title"
-              className="text-lg font-semibold text-text-primary"
-            >
-              Leo Voice
+            <h3 id="pocket-litert-test-title" className="text-lg font-semibold text-text-primary">
+              Pocket LiteRT Test
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Pocket TTS on this device.
+              Safe on-device Alba compatibility check.
             </p>
           </div>
           <button
@@ -190,89 +99,46 @@ export function PocketVoiceSetupSheet({
 
         <div className="space-y-4 px-5 py-5">
           <div className="rounded-xl bg-surface-2 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-text-primary">Leo reference</span>
-              <span
-                className={
-                  installed
-                    ? 'text-sm text-accent'
-                    : 'text-sm text-text-muted'
-                }
-              >
-                {checking ? 'Checking…' : active ? 'Active' : installed ? 'Installed' : 'Not installed'}
-              </span>
-            </div>
+            <p className="text-sm font-medium text-text-primary">This does not activate Pocket TTS</p>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Uses your saved Leo reference on this device.
+              It runs one fixed Alba sample in an isolated Web Worker. No Leo upload, no page reload, no audiobook buffer changes, and no server inference.
             </p>
           </div>
 
-          {installed && !active && (
-            <button
-              type="button"
-              disabled={busy || checking}
-              onClick={() => void handleUseLeo()}
-              className="pressable min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white disabled:opacity-50"
-            >
-              {busy ? 'Switching to Leo…' : 'Use Leo for TTS'}
-            </button>
-          )}
-
-          {active && (
-            <div className="rounded-xl bg-accent/10 px-4 py-3">
-              <p className="text-sm font-medium text-text-primary">Leo is active</p>
-              <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                Pocket TTS is selected.
-              </p>
-            </div>
-          )}
-
-          <div className="rounded-xl bg-surface-2 px-4 py-3">
-            <p className="text-sm font-medium text-text-primary">
-              Saved locally
-            </p>
-            <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              After first setup, Leo starts faster.
-            </p>
-          </div>
-
-          <label
-            className={`block ${busy ? 'pointer-events-none opacity-60' : ''}`}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runTest()}
+            className="pressable min-h-12 w-full rounded-xl bg-accent px-4 py-3 text-center font-semibold text-white disabled:opacity-60"
           >
-            <span className={`pressable flex min-h-12 w-full cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-center font-semibold ${active || installed ? 'bg-surface-2 text-text-primary' : 'bg-accent text-white'}`}>
-              {busy
-                ? 'Preparing Leo…'
-                : installed
-                  ? 'Replace Leo'
-                  : 'Install Leo'}
-            </span>
-            <input
-              type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.aac"
-              className="sr-only"
-              disabled={busy}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0] ?? null
-                event.currentTarget.value = ''
-                void handleFile(file)
-              }}
-            />
-          </label>
+            {busy ? 'Running LiteRT test…' : result ? 'Run Alba Test Again' : 'Run Alba LiteRT Test'}
+          </button>
 
-          {installed && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleRemove()}
-              className="pressable min-h-11 w-full rounded-xl bg-surface-2 px-4 py-3 text-sm font-medium text-error disabled:opacity-50"
-            >
-              Remove Leo
-            </button>
+          {(busy || stage) && (
+            <div className="rounded-xl bg-surface-2 px-4 py-3">
+              <p className="text-sm font-medium text-text-primary">{stage}</p>
+              {detail && <p className="mt-1 text-xs leading-relaxed text-text-muted">{detail}</p>}
+              {busy && (
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-4">
+                  <div className="h-full w-1/2 animate-pulse rounded-full bg-accent" />
+                </div>
+              )}
+            </div>
           )}
 
-          {message && (
-            <div className="rounded-xl bg-accent/10 px-4 py-3 text-sm leading-relaxed text-text-primary">
-              {message}
+          {result && audioUrl && (
+            <div className="space-y-3 rounded-xl bg-accent/10 px-4 py-4">
+              <div>
+                <p className="text-sm font-semibold text-text-primary">Alba generated successfully</p>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">“{result.text}”</p>
+              </div>
+              <audio className="w-full" controls preload="metadata" src={audioUrl} />
+              <div className="grid grid-cols-2 gap-2 text-xs text-text-muted">
+                <span>Audio: {result.duration.toFixed(1)} s</span>
+                <span>Generation: {(result.generationMs / 1000).toFixed(1)} s</span>
+                <span>Decode: {(result.decodeMs / 1000).toFixed(1)} s</span>
+                <span>Speed: {result.rtfx.toFixed(2)}× realtime</span>
+              </div>
             </div>
           )}
 
@@ -283,7 +149,7 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            Pocket downloads its model once and keeps it on this device.
+            The first run downloads roughly 200 MB of Pocket LiteRT assets. If the page freezes or Safari reloads, stop there; that result is useful and we will not add Leo on top of it.
           </p>
         </div>
       </div>
