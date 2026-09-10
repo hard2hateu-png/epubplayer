@@ -61,31 +61,37 @@ jobs:
             test('selection rows open matching controls and update values', async ({ page }) => {
               await page.getByText('Speed', { exact: true }).click()
               await page.getByText('1.25×', { exact: true }).click()
-              await expect(page.getByText('1.25×', { exact: true }).first()).toBeVisible()
+              await expect(page.getByRole('button', { name: /Speed 1\.25×/ })).toBeVisible()
 
               await page.getByText('Skip Forward', { exact: true }).click()
               await page.getByText('30 seconds', { exact: true }).click()
-              await expect(page.getByText('30s', { exact: true })).toBeVisible()
+              await expect(page.getByRole('button', { name: /Skip Forward 30s/ })).toBeVisible()
 
               await page.getByText('Skip Back', { exact: true }).click()
               await page.getByText('15 seconds', { exact: true }).click()
-              await expect(page.getByText('15s', { exact: true })).toBeVisible()
+              await expect(page.getByRole('button', { name: /Skip Back 15s/ })).toBeVisible()
 
               await page.getByText('Resume Rewind', { exact: true }).click()
               await page.getByText('10 seconds', { exact: true }).click()
-              await expect(page.getByText('10s', { exact: true })).toBeVisible()
+              await expect(page.getByRole('button', { name: /Resume Rewind 10s/ })).toBeVisible()
 
               await page.getByText('Voice Engine', { exact: true }).click()
-              await expect(page.getByText('Browser', { exact: true })).toBeVisible()
-              await page.getByText('Browser', { exact: true }).click()
-              await expect(page.getByText('Browser', { exact: true })).toBeVisible()
+              await expect(page.getByRole('option', { name: /Browser/ })).toBeVisible()
+              await page.getByRole('option', { name: /Browser/ }).click()
+              await expect(page.getByRole('button', { name: /Voice Engine Browser/ })).toBeVisible()
             })
 
-            test('Leo row opens the Leo sheet and controls match their labels', async ({ page }) => {
+            test('Leo setup exposes only actions that are currently valid', async ({ page }) => {
               await page.getByText('Leo Voice', { exact: true }).click()
               await expect(page.getByText('Pocket TTS on this device.', { exact: true })).toBeVisible()
-              await expect(page.getByRole('button', { name: /Install Leo|Replace Leo/ })).toBeVisible()
-              await expect(page.getByRole('button', { name: /Use Leo for TTS/ })).toBeVisible()
+
+              // A fresh browser has no private Leo reference. The sheet should offer
+              // installation, not a misleading Use/Remove action that cannot work yet.
+              await expect(page.getByText('Install Leo', { exact: true })).toBeVisible()
+              await expect(page.locator('input[type="file"][accept*="audio"]')).toHaveCount(1)
+              await expect(page.getByRole('button', { name: /Use Leo for TTS/ })).toHaveCount(0)
+              await expect(page.getByRole('button', { name: /Remove Leo/ })).toHaveCount(0)
+
               await page.getByRole('button', { name: 'Done' }).click()
               await expect(page.getByText('Leo Voice', { exact: true })).toBeVisible()
             })
