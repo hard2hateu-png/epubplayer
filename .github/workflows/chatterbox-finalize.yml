@@ -21,44 +21,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Patch on-demand callback wiring and concise disclosure
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          manager = Path('src/services/tts/ttsManager.ts')
-          text = manager.read_text()
-          old = """      // Engines that don't require init are ready immediately
-      if (!this.getCurrentCapabilities().requiresInit) {
-        log.debug('No initialization needed', { engine })
-        this.markReady()
-        return
-      }
-"""
-          new = """      // Engines that don't require model preload are ready immediately.
-      // Chatterbox still needs its service callbacks wired here; the remote
-      // connection itself remains deferred until the first generation request.
-      if (!this.getCurrentCapabilities().requiresInit) {
-        if (engine === 'chatterbox') {
-          this.wireUpService(chatterboxService, 'chatterbox')
-        }
-        log.debug('No initialization needed', { engine })
-        this.markReady()
-        return
-      }
-"""
-          if text.count(old) != 1:
-              raise SystemExit('Could not find TTS no-init block')
-          manager.write_text(text.replace(old, new, 1))
-
-          settings = Path('src/features/settings/SettingsPage.tsx')
-          text = settings.read_text()
-          old = "{ id: 'chatterbox' as TTSEngine, name: t`Chatterbox`, description: t`High-quality English voice cloning.` }"
-          new = "{ id: 'chatterbox' as TTSEngine, name: t`Chatterbox`, description: t`English voice clone. Sends Leo reference online.` }"
-          if text.count(old) != 1:
-              raise SystemExit('Could not find Chatterbox Settings description')
-          settings.write_text(text.replace(old, new, 1))
-          PY
+      - name: Apply final Chatterbox patch
+        run: python tools/finalize_chatterbox.py
 
       - name: Install dependencies
         run: npm ci
@@ -80,19 +44,19 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Remove generated catalog noise and temporary workflow
+      - name: Remove generated catalog noise and temporary files
         run: |
           git checkout origin/main -- src/locales
-          rm -f .github/workflows/chatterbox-finalize.yml
+          rm -f .github/workflows/chatterbox-finalize.yml tools/finalize_chatterbox.py
 
-      - name: Verify final diff has no private voice asset
+      - name: Verify no private voice asset is present
         run: |
           if git diff --name-only origin/main...HEAD | grep -Ei '\.(wav|mp3|m4a|aac|onnx|pt|safetensors)$'; then
-            echo 'Unexpected binary/private voice-like asset in branch diff' >&2
+            echo 'Unexpected voice/model asset in branch diff' >&2
             exit 1
           fi
           if git status --short | grep -Ei '\.(wav|mp3|m4a|aac|onnx|pt|safetensors)$'; then
-            echo 'Unexpected binary/private voice-like asset in working tree' >&2
+            echo 'Unexpected voice/model asset in working tree' >&2
             exit 1
           fi
 
@@ -101,9 +65,5 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
-          if git diff --cached --quiet; then
-            echo 'No changes to commit'
-          else
-            git commit -m 'Finalize on-demand Chatterbox integration'
-            git push origin HEAD:feat/chatterbox-turbo
-          fi
+          git commit -m 'Finalize on-demand Chatterbox integration'
+          git push origin HEAD:feat/chatterbox-turbo
