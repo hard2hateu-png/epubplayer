@@ -89,6 +89,7 @@ const SUPPORTED_TTS_ENGINES = new Set<TTSEngine>([
   'sherpa',
   'kitten',
   'pocket',
+  'chatterbox',
 ])
 
 function normalizeStoredTTSEngine(value: unknown): TTSEngine {

@@ -7,10 +7,12 @@ export function PocketVoiceSetupSheet({
   isOpen,
   onClose,
   onInstalledChange,
+  engine = 'pocket',
 }: {
   isOpen: boolean
   onClose: () => void
   onInstalledChange?: (installed: boolean) => void
+  engine?: 'pocket' | 'chatterbox'
 }) {
   const [installed, setInstalled] = useState(false)
   const [active, setActive] = useState(false)
@@ -35,10 +37,10 @@ export function PocketVoiceSetupSheet({
       pocketService.hasLeoVoiceSample(),
       settingsRepository.get('ttsEngine'),
     ])
-      .then(([hasReference, engine]) => {
+      .then(([hasReference, selectedEngine]) => {
         if (cancelled) return
         setInstalled(hasReference)
-        setActive(engine === 'pocket')
+        setActive(hasReference && selectedEngine === engine)
         onInstalledChange?.(hasReference)
       })
       .catch(() => {
@@ -54,7 +56,7 @@ export function PocketVoiceSetupSheet({
     return () => {
       cancelled = true
     }
-  }, [isOpen, onInstalledChange])
+  }, [isOpen, onInstalledChange, engine])
 
   if (!isOpen) return null
 
@@ -63,13 +65,12 @@ export function PocketVoiceSetupSheet({
     if (!hasReference) {
       setInstalled(false)
       onInstalledChange?.(false)
-      throw new Error('Install the Leo reference before using Pocket TTS.')
+      throw new Error('Install the Leo reference first.')
     }
 
-    // Pocket has one custom voice. Keep its engine + cache identity in sync so
-    // Settings, playback, and generated-audio caching all agree that Leo is active.
-    await settingsRepository.set('voiceId', 'pocket:leo')
-    await settingsRepository.set('ttsEngine', 'pocket')
+    const voiceId = engine === 'chatterbox' ? 'chatterbox:leo' : 'pocket:leo'
+    await settingsRepository.set('voiceId', voiceId)
+    await settingsRepository.set('ttsEngine', engine)
     setActive(true)
     ttsManager.destroy()
 
@@ -100,10 +101,10 @@ export function PocketVoiceSetupSheet({
       await pocketService.installLeoVoiceSample(file)
       setInstalled(true)
       onInstalledChange?.(true)
-      setMessage(
-        'Preparing Leo. First setup can take a while.'
-      )
-      await pocketService.initialize()
+      if (engine === 'pocket') {
+        setMessage('Preparing Leo. First setup can take a while.')
+        await pocketService.initialize()
+      }
       setMessage('Leo is ready.')
       await activateLeo()
     } catch (err) {
@@ -175,7 +176,7 @@ export function PocketVoiceSetupSheet({
               Leo Voice
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Pocket TTS on this device.
+              {engine === 'chatterbox' ? 'Chatterbox voice clone.' : 'Pocket TTS on this device.'}
             </p>
           </div>
           <button
@@ -222,7 +223,7 @@ export function PocketVoiceSetupSheet({
             <div className="rounded-xl bg-accent/10 px-4 py-3">
               <p className="text-sm font-medium text-text-primary">Leo is active</p>
               <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                Pocket TTS is selected.
+                {engine === 'chatterbox' ? 'Chatterbox is selected.' : 'Pocket TTS is selected.'}
               </p>
             </div>
           )}
@@ -283,7 +284,9 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            Pocket downloads its model once and keeps it on this device.
+            {engine === 'chatterbox'
+              ? 'Leo stays saved on this device. A short reference is sent only when the Chatterbox session needs conditioning.'
+              : 'Pocket downloads its model once and keeps it on this device.'}
           </p>
         </div>
       </div>

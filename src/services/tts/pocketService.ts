@@ -398,6 +398,16 @@ class PocketService {
   }
   async hasCustomLeoVoiceSample(): Promise<boolean> { return this.hasLeoVoiceSample() }
 
+  /** Return a short speech-dense WAV derived from the private on-device Leo reference. */
+  async getLeoPromptWav(seconds = 10): Promise<Blob> {
+    const safeSeconds = Math.max(6, Math.min(15, seconds))
+    const reference = await this.getReference()
+    const pcm = await decodeReference(reference, SAMPLE_RATE)
+    if (pcm.length < SAMPLE_RATE * 5) throw new Error('Leo voice sample is too short')
+    const prompt = selectRepresentativeWindow(pcm, SAMPLE_RATE, safeSeconds)
+    return chunksToWav([prompt], SAMPLE_RATE)
+  }
+
   async installLeoVoiceSample(blob: Blob): Promise<void> {
     if (!blob?.size) throw new Error('Leo voice sample is empty')
     if (blob.size > 30 * 1024 * 1024) throw new Error('Voice sample is too large')
