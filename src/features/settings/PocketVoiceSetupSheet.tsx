@@ -38,7 +38,7 @@ export function PocketVoiceSetupSheet({
       .then(([hasReference, engine]) => {
         if (cancelled) return
         setInstalled(hasReference)
-        setActive(engine === 'pocket')
+        setActive(hasReference && engine === 'pocket')
         onInstalledChange?.(hasReference)
       })
       .catch(() => {
@@ -62,19 +62,20 @@ export function PocketVoiceSetupSheet({
     const hasReference = await pocketService.hasLeoVoiceSample()
     if (!hasReference) {
       setInstalled(false)
+      setActive(false)
       onInstalledChange?.(false)
       throw new Error('Install the Leo reference before using Pocket TTS.')
     }
 
-    // Pocket has one custom voice. Keep its engine + cache identity in sync so
-    // Settings, playback, and generated-audio caching all agree that Leo is active.
     await settingsRepository.set('voiceId', 'pocket:leo')
     await settingsRepository.set('ttsEngine', 'pocket')
+    setInstalled(true)
     setActive(true)
+    onInstalledChange?.(true)
     ttsManager.destroy()
 
-    // The settings page already renders Pocket-specific controls from ttsEngine.
-    // Reload once so Supertonic/Kokoro controls disappear immediately and Voice = Leo.
+    // Switch to Pocket only after the server has confirmed Leo exists. Reload
+    // once so the stable player starts Pocket from a clean engine state.
     window.location.reload()
   }
 
@@ -97,16 +98,22 @@ export function PocketVoiceSetupSheet({
     setError(null)
 
     try {
+      setMessage('Uploading the reference and preparing Leo…')
       await pocketService.installLeoVoiceSample(file)
+
+      const hasReference = await pocketService.hasLeoVoiceSample()
+      if (!hasReference) {
+        throw new Error('The Pocket server did not confirm that Leo was installed.')
+      }
+
       setInstalled(true)
       onInstalledChange?.(true)
-      setMessage(
-        'Preparing Leo. First setup can take a while.'
-      )
-      await pocketService.initialize()
       setMessage('Leo is ready.')
       await activateLeo()
     } catch (err) {
+      setInstalled(false)
+      setActive(false)
+      onInstalledChange?.(false)
       setError(
         err instanceof Error
           ? err.message
@@ -124,6 +131,7 @@ export function PocketVoiceSetupSheet({
     try {
       await pocketService.removeLeoVoiceSample()
       setInstalled(false)
+      setActive(false)
       onInstalledChange?.(false)
 
       // Never leave the app pointing at Pocket when its only voice was removed.
@@ -135,7 +143,7 @@ export function PocketVoiceSetupSheet({
         return
       }
 
-      setMessage('Leo was removed from this device.')
+      setMessage('Leo was removed from the Pocket server.')
     } catch (err) {
       setError(
         err instanceof Error
@@ -175,7 +183,7 @@ export function PocketVoiceSetupSheet({
               Leo Voice
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Pocket TTS on this device.
+              Pocket TTS voice setup.
             </p>
           </div>
           <button
@@ -199,11 +207,11 @@ export function PocketVoiceSetupSheet({
                     : 'text-sm text-text-muted'
                 }
               >
-                {checking ? 'Checking…' : active ? 'Active' : installed ? 'Installed' : 'Not installed'}
+                {checking ? 'Checking…' : !installed ? 'Not installed' : active ? 'Active' : 'Installed'}
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Uses your saved Leo reference on this device.
+              Your reference is prepared by the native Pocket server.
             </p>
           </div>
 
@@ -229,10 +237,10 @@ export function PocketVoiceSetupSheet({
 
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <p className="text-sm font-medium text-text-primary">
-              Saved locally
+              Native Pocket
             </p>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              After first setup, Leo starts faster.
+              Voice cloning and speech generation run off-device so your iPhone only handles playback.
             </p>
           </div>
 
@@ -283,7 +291,7 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            Pocket downloads its model once and keeps it on this device.
+            The reader sends only the current narration text to Pocket and receives generated audio for playback.
           </p>
         </div>
       </div>
