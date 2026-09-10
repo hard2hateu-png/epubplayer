@@ -81,6 +81,22 @@ export const DEFAULT_SETTINGS: Settings = {
 export type SettingKey = keyof Settings
 export type SettingValue<K extends SettingKey> = Settings[K]
 
+const SUPPORTED_TTS_ENGINES = new Set<TTSEngine>([
+  'browser',
+  'piper',
+  'kokoro',
+  'supertonic',
+  'sherpa',
+  'kitten',
+  'pocket',
+])
+
+function normalizeStoredTTSEngine(value: unknown): TTSEngine {
+  return typeof value === 'string' && SUPPORTED_TTS_ENGINES.has(value as TTSEngine)
+    ? (value as TTSEngine)
+    : 'supertonic'
+}
+
 // ============================================================================
 // Settings Repository
 // ============================================================================
@@ -92,6 +108,11 @@ export const settingsRepository = {
   async get<K extends SettingKey>(key: K): Promise<SettingValue<K>> {
     const setting = await db.settings.get(key)
     if (setting) {
+      if (key === 'ttsEngine') {
+        const engine = normalizeStoredTTSEngine(setting.value)
+        if (setting.value !== engine) await db.settings.put({ key: 'ttsEngine', value: engine })
+        return engine as SettingValue<K>
+      }
       return setting.value as SettingValue<K>
     }
     return DEFAULT_SETTINGS[key]
@@ -113,10 +134,17 @@ export const settingsRepository = {
 
     for (const setting of stored) {
       const key = setting.key as SettingKey
-      if (key in settings) {
-        // @ts-expect-error - We know the types match
-        settings[key] = setting.value
+      if (!(key in settings)) continue
+
+      if (key === 'ttsEngine') {
+        const engine = normalizeStoredTTSEngine(setting.value)
+        settings.ttsEngine = engine
+        if (setting.value !== engine) await db.settings.put({ key: 'ttsEngine', value: engine })
+        continue
       }
+
+      // @ts-expect-error - We know the types match
+      settings[key] = setting.value
     }
 
     return settings
