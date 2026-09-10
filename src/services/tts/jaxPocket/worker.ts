@@ -32,10 +32,9 @@ const TOKENIZER_URL =
 const SAMPLE_RATE = 24_000
 const FRAME_SAMPLES = 1_920
 
-// NOTE: This experiment built successfully but crashed iPhone Safari while
-// preparing the Leo clone. The clone path requires the full Pocket model plus
-// Mimi encoder to coexist in WebKit's page/worker memory budget. Keep this
-// branch for postmortem only; do not merge or use it as the active iPhone path.
+// Postmortem note: this experiment built successfully but crashed iPhone Safari
+// while preparing the Leo clone. The clone path requires the full Pocket model
+// plus Mimi encoder inside WebKit's memory budget. Do not merge this branch.
 
 let model: PocketTTS | null = null
 let backend: Backend | null = null
