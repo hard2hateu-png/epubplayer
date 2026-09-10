@@ -108,8 +108,12 @@ export class LiteRTPocketTokenizer {
       if (byteMatch) this.byteTokenId[Number.parseInt(byteMatch[1], 16)] = id
       this.maxPieceChars = Math.max(this.maxPieceChars, Array.from(text).length)
     }
-    if (pieces.length !== 4001) {
-      throw new Error(`Unexpected Pocket tokenizer vocabulary (${pieces.length}, expected 4001)`)
+
+    // Kyutai's SentencePiece vocabulary contains 4,000 tokens (IDs 0–3999).
+    // The converted LiteRT embedding asset intentionally has 4,001 rows; the
+    // additional row is model-side state and is not emitted by the tokenizer.
+    if (pieces.length !== 4000) {
+      throw new Error(`Unexpected Pocket tokenizer vocabulary (${pieces.length}, expected 4000)`)
     }
   }
 
