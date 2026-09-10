@@ -1,0 +1,54 @@
+name: Apply LiteRT Pocket probe
+
+on:
+  push:
+    branches:
+      - experiment-pocket-litert
+
+permissions:
+  contents: write
+
+jobs:
+  build-probe:
+    if: ${{ !contains(github.event.head_commit.message, '[litert-probe-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: experiment-pocket-litert
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply isolated Settings guard
+        run: python .github/scripts/apply_litert_pocket_probe.py
+
+      - name: Install LiteRT.js
+        run: npm install --save-exact @litertjs/core@2.5.3
+
+      - name: Verify probe cannot activate Pocket
+        run: |
+          grep -q "LiteRT is a compatibility probe only on this branch" src/features/settings/SettingsPage.tsx
+          grep -q "setActiveSheet('pocketLeo')" src/features/settings/SettingsPage.tsx
+          ! grep -R "pocket-native\|railway.app\|/voice/install" src/services/tts/litertPocketProbe* src/services/tts/litertSentencePiece.ts
+
+      - name: Stable chunking tests
+        run: npx vitest run src/services/tts/textChunking.test.ts
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit reproducible probe
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json vite.config.ts src/features/settings/SettingsPage.tsx src/features/settings/PocketVoiceSetupSheet.tsx src/services/tts/litertPocketProbe.ts src/services/tts/litertPocketProbe.worker.ts src/services/tts/litertSentencePiece.ts
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "Build isolated Pocket LiteRT Alba probe [litert-probe-applied]"
+          git push origin HEAD:experiment-pocket-litert
