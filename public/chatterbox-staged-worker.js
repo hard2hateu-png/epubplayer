@@ -12,6 +12,7 @@ const CACHE_LAYERS = 30
 const CACHE_HEADS = 16
 const CACHE_HEAD_DIM = 64
 const MAX_TEXT_CHARS = 200
+const WASM_THREADS = 4
 
 const COMPONENTS = {
   speech_encoder: { file: 'speech_encoder.onnx', data: 'speech_encoder.onnx_data', mib: 564 },
@@ -25,6 +26,7 @@ let tokenizer = null
 let conditioning = null
 let busy = false
 let cancelled = false
+let activeThreads = 1
 
 function progress(status, detail = '', extra = {}) {
   self.postMessage({ type: 'progress', status, detail, ...extra })
@@ -60,15 +62,28 @@ function findExternalDataPath(bytes, fallback) {
 }
 
 async function initRuntime() {
-  if (ort && tokenizer) return { ready: true, alreadyLoaded: true }
-  if (busy) throw new Error('Staged Chatterbox worker is already busy')
+  if (ort && tokenizer) return {
+    ready: true,
+    alreadyLoaded: true,
+    threads: activeThreads,
+    crossOriginIsolated: self.crossOriginIsolated === true,
+    sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+  }
+  if (busy) throw new Error('4-thread Chatterbox worker is already busy')
   busy = true
   const started = performance.now()
   try {
-    progress('Loading ONNX Runtime', `WASM ${ORT_VERSION} · single threaded`)
+    const isolated = self.crossOriginIsolated === true
+    const hasSharedArrayBuffer = typeof SharedArrayBuffer !== 'undefined'
+    if (!isolated || !hasSharedArrayBuffer) {
+      throw new Error(`4-thread WASM unavailable: crossOriginIsolated=${isolated}, SharedArrayBuffer=${hasSharedArrayBuffer}. Open the dedicated Vercel 4-thread test URL.`)
+    }
+
+    activeThreads = Math.max(1, Math.min(WASM_THREADS, Number(self.navigator?.hardwareConcurrency) || WASM_THREADS))
+    progress('Loading ONNX Runtime', `WASM ${ORT_VERSION} · ${activeThreads} threads`)
     ort = await import(`${ORT_DIST}ort.wasm.bundle.min.mjs`)
     ort.env.wasm.wasmPaths = ORT_DIST
-    ort.env.wasm.numThreads = 1
+    ort.env.wasm.numThreads = activeThreads
 
     progress('Loading tokenizer', 'No model weights are resident yet')
     const transformers = await import(TRANSFORMERS_URL)
@@ -79,7 +94,14 @@ async function initRuntime() {
     }
     tokenizer = await transformers.AutoTokenizer.from_pretrained(MODEL_ID)
 
-    return { ready: true, initMs: performance.now() - started }
+    return {
+      ready: true,
+      initMs: performance.now() - started,
+      threads: activeThreads,
+      hardwareConcurrency: Number(self.navigator?.hardwareConcurrency) || null,
+      crossOriginIsolated: isolated,
+      sharedArrayBuffer: hasSharedArrayBuffer,
+    }
   } finally {
     busy = false
   }
@@ -92,7 +114,7 @@ async function loadSession(name) {
 
   progress(
     `Loading ${name.replaceAll('_', ' ')}`,
-    `~${component.mib} MiB · only this stage plus its required partner remains resident`,
+    `~${component.mib} MiB · ${activeThreads}-thread WASM · staged memory`,
     { component: name },
   )
 
@@ -283,41 +305,79 @@ async function prepareVoice(samples) {
   if (!(samples instanceof Float32Array) || samples.length < SAMPLE_RATE * 5) {
     throw new Error('Leo reference must contain at least 5 seconds of decoded audio')
   }
-  if (busy) throw new Error('Staged Chatterbox worker is already busy')
+  if (busy) throw new Error('4-thread Chatterbox worker is already busy')
   busy = true
   cancelled = false
   const started = performance.now()
   let session = null
   let input = null
+
+  const encodeSegment = async (segment, label, keep) => {
+    if (cancelled) throw new DOMException('Cancelled', 'AbortError')
+    progress('Encoding Leo', `${label} · ${(segment.length / SAMPLE_RATE).toFixed(1)}s · ${activeThreads} threads`)
+    input = new ort.Tensor('float32', segment, [1, segment.length])
+    const outputs = await session.run({ audio_values: input })
+    disposeTensor(input)
+    input = null
+    const ordered = session.outputNames.map((name) => outputs[name])
+    if (ordered.length < 4) {
+      disposeTensorMap(outputs)
+      throw new Error(`Speech encoder returned ${ordered.length} outputs; expected 4`)
+    }
+    const picked = {}
+    if (keep.audioFeatures) picked.audioFeatures = cloneTensor(ordered[0])
+    if (keep.audioTokens) picked.audioTokens = cloneTensor(ordered[1])
+    if (keep.speakerEmbeddings) picked.speakerEmbeddings = cloneTensor(ordered[2])
+    if (keep.speakerFeatures) picked.speakerFeatures = cloneTensor(ordered[3])
+    disposeTensorMap(outputs)
+    return picked
+  }
+
   try {
     await initRuntime()
-    progress('Stage 1/3 · Preparing Leo', `${(samples.length / SAMPLE_RATE).toFixed(1)}s reference`)
+    const sourceSeconds = samples.length / SAMPLE_RATE
+    const lmSamples = samples.subarray(0, Math.min(samples.length, SAMPLE_RATE * 6))
+    const decoderSamples = samples.subarray(0, Math.min(samples.length, SAMPLE_RATE * 10))
+
+    progress(
+      'Stage 1/3 · Preparing Leo',
+      `${sourceSeconds.toFixed(1)}s source · full identity, 10s decoder prompt, 6s LM prompt · ${activeThreads} threads`,
+    )
     session = await loadSession('speech_encoder')
     if (cancelled) throw new DOMException('Cancelled', 'AbortError')
 
-    input = new ort.Tensor('float32', samples, [1, samples.length])
-    const outputs = await session.run({ audio_values: input })
-    const ordered = session.outputNames.map((name) => outputs[name])
-    if (ordered.length < 4) throw new Error(`Speech encoder returned ${ordered.length} outputs; expected 4`)
+    const fullIdentity = await encodeSegment(samples, 'Speaker identity', {
+      speakerEmbeddings: true,
+    })
+    const decoderPrompt = await encodeSegment(decoderSamples, 'Decoder conditioning', {
+      audioTokens: true,
+      speakerFeatures: true,
+    })
+    const lmPrompt = await encodeSegment(lmSamples, 'Autoregressive prompt', {
+      audioFeatures: true,
+    })
 
     if (conditioning) disposeTensorMap(conditioning)
     conditioning = {
-      audioFeatures: cloneTensor(ordered[0]),
-      audioTokens: cloneTensor(ordered[1]),
-      speakerEmbeddings: cloneTensor(ordered[2]),
-      speakerFeatures: cloneTensor(ordered[3]),
+      audioFeatures: lmPrompt.audioFeatures,
+      audioTokens: decoderPrompt.audioTokens,
+      speakerEmbeddings: fullIdentity.speakerEmbeddings,
+      speakerFeatures: decoderPrompt.speakerFeatures,
     }
-    disposeTensorMap(outputs)
 
-    progress('Releasing speech encoder', 'Leo conditioning kept; ~564 MiB session released')
+    progress('Releasing speech encoder', 'Compact conditioning kept; ~564 MiB session released')
     await releaseSession(session)
     session = null
 
     return {
-      referenceSeconds: samples.length / SAMPLE_RATE,
+      referenceSeconds: sourceSeconds,
+      identityReferenceSeconds: sourceSeconds,
+      decoderPromptSeconds: decoderSamples.length / SAMPLE_RATE,
+      lmPromptSeconds: lmSamples.length / SAMPLE_RATE,
       prepareMs: performance.now() - started,
       audioFeatureDims: conditioning.audioFeatures.dims,
       promptTokenCount: conditioning.audioTokens.data.length,
+      threads: activeThreads,
     }
   } finally {
     disposeTensor(input)
@@ -327,18 +387,19 @@ async function prepareVoice(samples) {
 }
 
 async function generateSpeechTokens(text, settings) {
+  const started = performance.now()
   let embedSession = null
   let lmSession = null
   let kv = null
   const generated = [START_SPEECH_TOKEN]
   let reachedEos = false
 
-  const cfgWeight = settings.cfgWeight ?? 0.5
+  const cfgWeight = settings.cfgWeight ?? 0.0
   const batchSize = cfgWeight > 0 ? 2 : 1
   const maxNewTokens = Math.max(32, Math.min(384, Number(settings.maxNewTokens) || 256))
 
   try {
-    progress('Stage 2/3 · Loading token models', '~397 MiB combined · Q4 language model')
+    progress('Stage 2/3 · Loading token models', `~397 MiB combined · Q4 language model · ${activeThreads} threads`)
     embedSession = await loadSession('embed_tokens')
     lmSession = await loadSession('language_model')
     if (cancelled) throw new DOMException('Cancelled', 'AbortError')
@@ -411,7 +472,7 @@ async function generateSpeechTokens(text, settings) {
       disposeTensor(logitsTensor)
 
       if (step % 10 === 0 || token === STOP_SPEECH_TOKEN) {
-        progress('Generating speech tokens', `${step + 1}/${maxNewTokens}`)
+        progress('Generating speech tokens', `${step + 1}/${maxNewTokens} · ${activeThreads} threads`)
       }
 
       if (token === STOP_SPEECH_TOKEN) {
@@ -422,7 +483,7 @@ async function generateSpeechTokens(text, settings) {
     }
 
     const audioTokens = reachedEos ? generated.slice(1, -1) : generated.slice(1)
-    return { audioTokens, reachedEos }
+    return { audioTokens, reachedEos, tokenMs: performance.now() - started }
   } finally {
     disposeTensorMap(kv)
     progress('Releasing token models', 'Embed + Q4 language model released before vocoder loads')
@@ -432,10 +493,11 @@ async function generateSpeechTokens(text, settings) {
 }
 
 async function synthesizeWaveform(generatedTokens) {
+  const started = performance.now()
   let decoderSession = null
   let speechTokens = null
   try {
-    progress('Stage 3/3 · Loading decoder', '~510 MiB · token models already released')
+    progress('Stage 3/3 · Loading decoder', `~510 MiB · token models released · ${activeThreads} threads`)
     decoderSession = await loadSession('conditional_decoder')
     if (cancelled) throw new DOMException('Cancelled', 'AbortError')
 
@@ -443,7 +505,7 @@ async function synthesizeWaveform(generatedTokens) {
     const all = [...prompt, ...generatedTokens, SILENCE_TOKEN, SILENCE_TOKEN, SILENCE_TOKEN]
     speechTokens = int64Tensor(all, [1, all.length])
 
-    progress('Synthesizing waveform', `${generatedTokens.length} new speech tokens`)
+    progress('Synthesizing waveform', `${generatedTokens.length} new speech tokens · ${activeThreads} threads`)
     const outputs = await decoderSession.run({
       speech_tokens: speechTokens,
       speaker_embeddings: conditioning.speakerEmbeddings,
@@ -452,7 +514,7 @@ async function synthesizeWaveform(generatedTokens) {
     const waveformTensor = outputs[decoderSession.outputNames[0]]
     const waveform = Float32Array.from(waveformTensor.data, Number)
     disposeTensorMap(outputs)
-    return waveform
+    return { waveform, decoderMs: performance.now() - started }
   } finally {
     disposeTensor(speechTokens)
     progress('Releasing decoder', 'No large model session remains resident')
@@ -462,7 +524,7 @@ async function synthesizeWaveform(generatedTokens) {
 
 async function generate(text, options = {}) {
   if (!conditioning) throw new Error('Prepare Leo first')
-  if (busy) throw new Error('Staged Chatterbox worker is already busy')
+  if (busy) throw new Error('4-thread Chatterbox worker is already busy')
 
   const cleaned = normalizeText(text)
   if (!cleaned) throw new Error('Enter some text to synthesize')
@@ -477,24 +539,27 @@ async function generate(text, options = {}) {
     const settings = {
       temperature: 0.9,
       exaggeration: 0.5,
-      cfgWeight: 0.5,
+      cfgWeight: 0.0,
       repetitionPenalty: 1.2,
       minP: 0.05,
       maxNewTokens: 256,
       ...options,
     }
     const tokenResult = await generateSpeechTokens(cleaned, settings)
-    const waveform = await synthesizeWaveform(tokenResult.audioTokens)
+    const decoded = await synthesizeWaveform(tokenResult.audioTokens)
     const elapsed = performance.now() - started
-    const duration = waveform.length / SAMPLE_RATE
+    const duration = decoded.waveform.length / SAMPLE_RATE
     return {
-      waveform,
+      waveform: decoded.waveform,
       sampleRate: SAMPLE_RATE,
       generationMs: elapsed,
+      tokenMs: tokenResult.tokenMs,
+      decoderMs: decoded.decoderMs,
       audioDuration: duration,
       generatedTokens: tokenResult.audioTokens.length,
       reachedEos: tokenResult.reachedEos,
       chars: cleaned.length,
+      threads: activeThreads,
       settings,
     }
   } finally {
