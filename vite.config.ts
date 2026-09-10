@@ -102,8 +102,10 @@ export default defineConfig({
       },
     }),
   ],
+  // LiteRT's worker-side WASM bootstrap uses importScripts(). Keep worker
+  // bundles classic/IIFE so Safari does not reject that API as a module worker.
   worker: {
-    format: 'es',
+    format: 'iife',
   },
   resolve: {
     alias: {
