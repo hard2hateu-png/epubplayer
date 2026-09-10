@@ -37,9 +37,10 @@ describe('splitTextIntoChunks', () => {
   })
 
   it('keeps a quoted question with its dialogue tag when a better pause exists', () => {
-    const text = 'She leaned closer, studying his expression, because she had wanted to ask him this for years, but never found the nerve. "Is it true you dated a newsreader?" she asked, delighted at her own daring.'
+    const text = '"I had wanted to ask you this for months, but every time I tried, I lost my nerve, and now I just need to know whether it is true that you dated a newsreader?" she asked, delighted at her own daring.'
     const chunks = splitTextIntoChunks(text, 150, { splitLongSentences: true })
 
+    expect(chunks.length).toBeGreaterThan(1)
     expect(chunks.every((chunk) => chunk.length <= 150)).toBe(true)
     expect(chunks.some((chunk) => /newsreader\?["”’]?\s*$/.test(chunk))).toBe(false)
     expect(chunks.some((chunk) => /^she asked\b/i.test(chunk))).toBe(false)
