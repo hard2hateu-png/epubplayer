@@ -59,9 +59,12 @@ export function runLiteRTPocketProbe(
   onStatus?: LiteRTPocketProbeStatus,
 ): Promise<LiteRTPocketProbeResult> {
   return new Promise((resolve, reject) => {
+    // LiteRT's WASM bootstrap calls importScripts() when it runs inside a worker.
+    // importScripts() is illegal in module workers, so this probe must stay a
+    // classic worker. Vite bundles the worker as an IIFE via vite.config.ts.
     const worker = new Worker(
       new URL('./litertPocketProbe.worker.ts', import.meta.url),
-      { type: 'module', name: 'pocket-litert-alba-probe' },
+      { name: 'pocket-litert-alba-probe' },
     )
     let settled = false
     const timeout = window.setTimeout(() => {
