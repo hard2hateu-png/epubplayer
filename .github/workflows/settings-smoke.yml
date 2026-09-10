@@ -108,7 +108,7 @@ jobs:
           })
           EOF
       - name: Run Settings smoke tests
-        run: npx playwright test e2e/settings-buttons-temp.spec.ts --project=chromium
+        run: npx playwright test e2e/settings-buttons-temp.spec.ts
       - name: Commit only catalog cleanup
         run: |
           rm -f e2e/settings-buttons-temp.spec.ts .github/workflows/settings-smoke.yml
