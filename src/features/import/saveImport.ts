@@ -120,7 +120,11 @@ export async function saveImportedContent(
     publisher: metadata.publisher,
     description: metadata.description,
     totalSections: finalSections.length,
-    epubBlob: originalBlob,
+    sourceType: metadata.sourceType,
+    // Keep EPUB bytes in the EPUB-only field used by page-map recovery.
+    // Other source files (especially PDFs) must never be handed to the EPUB parser.
+    epubBlob: metadata.sourceType === 'epub' ? originalBlob : undefined,
+    originalBlob: metadata.sourceType !== 'epub' ? originalBlob : undefined,
     contentHash,
     // EPUB parsing already did the publisher-page scan during import. Persist that
     // fact so first playback does not reopen/rescan the EPUB just to recover data

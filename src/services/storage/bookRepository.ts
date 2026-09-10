@@ -1,6 +1,43 @@
 import { db, type Book, type Section, sectionId } from './db'
 
 // ============================================================================
+// Legacy source migration helpers
+// ============================================================================
+
+async function isPdfBlob(blob: Blob): Promise<boolean> {
+  if (blob.type.toLowerCase() === 'application/pdf') return true
+
+  // Some iOS file providers hand back an empty or generic MIME type. Check the
+  // actual file signature so already-imported PDFs are still migrated safely.
+  try {
+    return (await blob.slice(0, 5).text()) === '%PDF-'
+  } catch {
+    return false
+  }
+}
+
+async function migrateLegacyOriginalFile(book: Book): Promise<Book> {
+  if (!book.epubBlob) return book
+
+  const isLegacyPdf = book.sourceType === 'pdf' || (!book.sourceType && await isPdfBlob(book.epubBlob))
+  if (!isLegacyPdf) return book
+
+  const pdfBlob = book.epubBlob
+  book.sourceType = 'pdf'
+  book.originalBlob = book.originalBlob ?? pdfBlob
+  book.epubBlob = undefined
+
+  // Persist once so subsequent opens never route this PDF through EPUB parsing.
+  await db.books.update(book.id, {
+    sourceType: 'pdf',
+    originalBlob: book.originalBlob,
+    epubBlob: undefined,
+  })
+
+  return book
+}
+
+// ============================================================================
 // Book Repository
 // ============================================================================
 
@@ -21,8 +58,12 @@ export const bookRepository = {
    * Get a book by ID
    */
   async get(id: string): Promise<Book | undefined> {
-    const book = await db.books.get(id)
-    if (book?.coverBlob) {
+    let book = await db.books.get(id)
+    if (!book) return undefined
+
+    book = await migrateLegacyOriginalFile(book)
+
+    if (book.coverBlob) {
       // Generate object URL for cover
       book.coverUrl = URL.createObjectURL(book.coverBlob)
     }
@@ -35,10 +76,11 @@ export const bookRepository = {
   async getAll(): Promise<Book[]> {
     const books = await db.books.toArray()
 
-    // Generate cover URLs
-    for (const book of books) {
-      if (book.coverBlob) {
-        book.coverUrl = URL.createObjectURL(book.coverBlob)
+    // Migrate legacy PDF storage and generate cover URLs.
+    for (let i = 0; i < books.length; i++) {
+      books[i] = await migrateLegacyOriginalFile(books[i])
+      if (books[i].coverBlob) {
+        books[i].coverUrl = URL.createObjectURL(books[i].coverBlob!)
       }
     }
 
