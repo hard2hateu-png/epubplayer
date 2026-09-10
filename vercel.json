@@ -124,6 +124,14 @@
       "source": "/chatterbox-staged-test",
       "headers": [
         {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
           "key": "Cache-Control",
           "value": "no-store"
         }
@@ -133,6 +141,14 @@
       "source": "/chatterbox-staged-test.html",
       "headers": [
         {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
           "key": "Cache-Control",
           "value": "no-store"
         }
@@ -141,6 +157,18 @@
     {
       "source": "/chatterbox-staged-worker.js",
       "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        },
         {
           "key": "Cache-Control",
           "value": "no-store"
