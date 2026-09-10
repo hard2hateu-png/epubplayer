@@ -2,7 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/((?!api|_next|static|public|favicon\\.svg|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.png|.*\\.jpg|.*\\.epub).*)",
+      "source": "/nano-test",
+      "destination": "/nano-test.html"
+    },
+    {
+      "source": "/((?!api|_next|static|public|nano-test(?:\\.html)?|nano-test\\.js|nano-test-worker\\.js|favicon\\.svg|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.png|.*\\.jpg|.*\\.epub).*)",
       "destination": "/index.html"
     }
   ],
@@ -21,6 +25,58 @@
       ]
     },
     {
+      "source": "/nano-test",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/nano-test.html",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/nano-test.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/nano-test-worker.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -31,4 +87,3 @@
     }
   ]
 }
-
