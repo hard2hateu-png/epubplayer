@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <meta name="theme-color" content="#0b0d12" />
-<title>Full Chatterbox — Warm Session Benchmark</title>
+<title>Full Chatterbox — Q4 Decoder Benchmark</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
 *{box-sizing:border-box}body{margin:0;background:#0b0d12;color:#f5f6f7;min-height:100vh}
@@ -27,11 +27,11 @@ audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transfo
 </head>
 <body>
 <main>
-  <div class="step">FULL ORIGINAL CHATTERBOX · 4 THREADS · SESSION REUSE</div>
-  <h1>Warm-session benchmark</h1>
+  <div class="step">FULL ORIGINAL CHATTERBOX · 4 THREADS · Q4 DECODER ONLY</div>
+  <h1>Q4 decoder benchmark</h1>
   <div id="isolation" class="notice"><strong>Checking thread support…</strong></div>
-  <p>This keeps one token-model session alive for two chunks, then one decoder session alive for both waveforms. It measures the read-ahead architecture without changing Leo’s voice settings.</p>
-  <div class="notice">Frozen baseline: full Leo identity reference · 10s decoder prompt · 6s LM prompt · temperature 0.9 · exaggeration 0.5 · CFG 0 · repetition 1.2 · Min-P 0.05 · ≤200 chars.</div>
+  <p>This keeps the validated English Original Chatterbox pipeline and Leo conditioning. The only model change is the final conditional decoder: the same decoder weights, quantized from FP32 to Q4.</p>
+  <div class="notice">Frozen Leo baseline: full identity reference · 10s decoder prompt · 6s LM prompt · temperature 0.9 · exaggeration 0.5 · CFG 0 · repetition 1.2 · Min-P 0.05 · ≤200 chars. The English Original tokenizer and Q4 language model are unchanged.</div>
 
   <section class="card">
     <h2>Current status</h2>
@@ -67,16 +67,17 @@ audio{width:100%;margin-top:10px}.step{color:#8d96a5;font-size:12px;text-transfo
       <div><span>WASM threads</span><strong>4</strong></div>
       <div><span>Token sessions</span><strong>1 load → 2 runs</strong></div>
       <div><span>Decoder session</span><strong>1 load → 2 runs</strong></div>
+      <div><span>Decoder precision</span><strong>Q4 · ~215 MB</strong></div>
       <div><span>Voice recipe</span><strong>unchanged</strong></div>
     </div>
     <label for="text">Text used for both runs</label>
     <textarea id="text" maxlength="200"></textarea>
     <div id="count" class="count">0/200</div>
-    <button id="benchmark" disabled>Run 2-chunk warm-session benchmark</button>
+    <button id="benchmark" disabled>Run 2-chunk Q4 decoder benchmark</button>
     <div id="benchmark-result" class="muted"></div>
     <div id="outputs" class="result-grid" hidden>
-      <div><strong>Output 1</strong><audio id="out1" controls preload="metadata"></audio></div>
-      <div><strong>Output 2</strong><audio id="out2" controls preload="metadata"></audio></div>
+      <div><strong>Q4 Output 1</strong><audio id="out1" controls preload="metadata"></audio></div>
+      <div><strong>Q4 Output 2</strong><audio id="out2" controls preload="metadata"></audio></div>
     </div>
   </section>
 
@@ -95,11 +96,11 @@ const state={worker:null,file:null,refUrl:null,outUrls:[],initialized:false,prep
 function log(message,kind=''){const row=document.createElement('div');row.className=kind;row.textContent=`${new Date().toLocaleTimeString()}  ${message}`;$('log').append(row);$('log').scrollTop=$('log').scrollHeight}
 function status(title,detail=''){$('status-title').textContent=title;$('status-detail').textContent=detail}
 function setBusy(v){$('init').disabled=v||state.initialized;$('prepare').disabled=v||!state.initialized||!state.file;$('benchmark').disabled=v||!state.prepared}
-function mark(phase){state.phase=phase;if(phase)localStorage.setItem('chatterboxWarmPhase',JSON.stringify({phase,at:Date.now()}));else localStorage.removeItem('chatterboxWarmPhase')}
+function mark(phase){state.phase=phase;if(phase)localStorage.setItem('chatterboxQ4DecoderPhase',JSON.stringify({phase,at:Date.now()}));else localStorage.removeItem('chatterboxQ4DecoderPhase')}
 function start(phase){state.started=performance.now();mark(phase);const s=state.started;const tick=()=>{if(state.started!==s)return;$('elapsed').textContent=`${((performance.now()-s)/1000).toFixed(1)}s`;requestAnimationFrame(tick)};tick()}
 function stop(){state.started=null;mark(null)}
-function workerUrl(){const u=new URL('/chatterbox-staged-worker.js',location.origin);u.searchParams.set('v','20260910-warm-reuse-v1');return u.href}
-function worker(){if(state.worker)return state.worker;const w=new Worker(workerUrl(),{type:'module',name:'chatterbox-warm-reuse'});w.onmessage=e=>onWorker(e.data);w.onerror=e=>fail(new Error(e.message||'Worker crashed'));state.worker=w;return w}
+function workerUrl(){const u=new URL('/chatterbox-full-test-worker.js',location.origin);u.searchParams.set('v','20260910-q4-decoder-v1');return u.href}
+function worker(){if(state.worker)return state.worker;const w=new Worker(workerUrl(),{type:'module',name:'chatterbox-q4-decoder'});w.onmessage=e=>onWorker(e.data);w.onerror=e=>fail(new Error(e.message||'Worker crashed'));state.worker=w;return w}
 const pending=new Map();let rpcId=0
 function rpc(type,payload={},transfer=[]){return new Promise((resolve,reject)=>{const id=++rpcId;pending.set(id,{resolve,reject});worker().postMessage({id,type,payload},transfer)})}
 function onWorker(msg){if(msg.type==='progress'){status(msg.status||'Working',msg.detail||'');log(`${msg.status||'Working'}${msg.detail?` — ${msg.detail}`:''}`);return}const p=pending.get(msg.id);if(!p)return;pending.delete(msg.id);if(msg.type==='error')p.reject(new Error(msg.error||'Worker error'));else p.resolve(msg.result)}
@@ -110,11 +111,11 @@ function showIsolation(){const isolated=window.crossOriginIsolated===true,sab=ty
 $('text').value=TEST_TEXT;$('count').textContent=`${TEST_TEXT.length}/${MAX_TEXT}`;$('text').oninput=()=>{$('count').textContent=`${$('text').value.length}/${MAX_TEXT}`}
 $('file').onchange=()=>{const f=$('file').files?.[0];if(!f)return;state.file=f;if(state.refUrl)URL.revokeObjectURL(state.refUrl);state.refUrl=URL.createObjectURL(f);$('ref-audio').src=state.refUrl;$('ref-wrap').hidden=false;state.prepared=false;setBusy(false);log(`Selected ${f.name}; reference remains local.`)}
 $('init').onclick=async()=>{setBusy(true);start('runtime-init');try{state.init=await rpc('init');state.initialized=true;$('init-result').textContent=`Runtime ready in ${(state.init.initMs/1000).toFixed(1)}s · ${state.init.threads} threads.`;$('init-result').className='ok';status('Runtime ready','Next: prepare Leo');stop();setBusy(false)}catch(e){fail(e)}}
-$('prepare').onclick=async()=>{setBusy(true);start('speech-encoder');try{const samples=await decodeReference(state.file);state.prepare=await rpc('prepare',{samples},[samples.buffer]);state.prepared=true;$('prepare-result').textContent=`Leo prepared in ${(state.prepare.prepareMs/1000).toFixed(1)}s; encoder released.`;$('prepare-result').className='ok';status('Leo ready','Run the warm-session benchmark');stop();setBusy(false)}catch(e){fail(e)}}
-$('benchmark').onclick=async()=>{const text=$('text').value.replace(/\s+/g,' ').trim();if(!text||text.length>MAX_TEXT)return;setBusy(true);start('warm-session-benchmark');try{state.benchmark=await rpc('benchmark',{texts:[text,text]});state.outUrls.forEach(URL.revokeObjectURL);state.outUrls=[];state.benchmark.outputs.forEach((item,i)=>{const samples=new Float32Array(item.waveform);const url=URL.createObjectURL(wavBlob(samples,item.sampleRate||SAMPLE_RATE));state.outUrls.push(url);$(`out${i+1}`).src=url});$('outputs').hidden=false;const t=state.benchmark.tokenRuns,d=state.benchmark.decoderRuns;$('benchmark-result').innerHTML=`Token load ${(state.benchmark.tokenSessionLoadMs/1000).toFixed(1)}s · token runs ${(t[0].inferenceMs/1000).toFixed(1)}s / ${(t[1].inferenceMs/1000).toFixed(1)}s<br>Decoder load ${(state.benchmark.decoderSessionLoadMs/1000).toFixed(1)}s · decoder runs ${(d[0].inferenceMs/1000).toFixed(1)}s / ${(d[1].inferenceMs/1000).toFixed(1)}s<br>Total ${(state.benchmark.totalMs/1000).toFixed(1)}s for ${d[0].audioDuration.toFixed(2)}s + ${d[1].audioDuration.toFixed(2)}s audio`;state.benchmark={...state.benchmark,outputs:undefined};$('benchmark-result').className='ok';status('Benchmark complete','Both large sessions were reused, then released');log('Warm-session benchmark completed.','ok');stop();setBusy(false)}catch(e){fail(e)}}
-$('copy').onclick=async()=>{const report={test:'Full Chatterbox 4-thread warm-session reuse benchmark',timestamp:new Date().toISOString(),device:{userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,crossOriginIsolated:window.crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined'},settings:{maxTextChars:MAX_TEXT,temperature:.9,exaggeration:.5,cfgWeight:0,repetitionPenalty:1.2,minP:.05,maxReferenceSeconds:MAX_REF_SECONDS},init:state.init,leo:state.prepare,benchmark:state.benchmark,errors:state.errors};await navigator.clipboard.writeText(JSON.stringify(report,null,2));$('copy').textContent='Copied — paste into ChatGPT';setTimeout(()=>$('copy').textContent='Copy diagnostic report',2200)}
+$('prepare').onclick=async()=>{setBusy(true);start('speech-encoder');try{const samples=await decodeReference(state.file);state.prepare=await rpc('prepare',{samples},[samples.buffer]);state.prepared=true;$('prepare-result').textContent=`Leo prepared in ${(state.prepare.prepareMs/1000).toFixed(1)}s; encoder released.`;$('prepare-result').className='ok';status('Leo ready','Run the Q4 decoder benchmark');stop();setBusy(false)}catch(e){fail(e)}}
+$('benchmark').onclick=async()=>{const text=$('text').value.replace(/\s+/g,' ').trim();if(!text||text.length>MAX_TEXT)return;setBusy(true);start('q4-decoder-benchmark');try{state.benchmark=await rpc('benchmark',{texts:[text,text]});state.outUrls.forEach(URL.revokeObjectURL);state.outUrls=[];state.benchmark.outputs.forEach((item,i)=>{const samples=new Float32Array(item.waveform);const url=URL.createObjectURL(wavBlob(samples,item.sampleRate||SAMPLE_RATE));state.outUrls.push(url);$(`out${i+1}`).src=url});$('outputs').hidden=false;const t=state.benchmark.tokenRuns,d=state.benchmark.decoderRuns;$('benchmark-result').innerHTML=`Token load ${(state.benchmark.tokenSessionLoadMs/1000).toFixed(1)}s · token runs ${(t[0].inferenceMs/1000).toFixed(1)}s / ${(t[1].inferenceMs/1000).toFixed(1)}s<br>Q4 decoder load ${(state.benchmark.decoderSessionLoadMs/1000).toFixed(1)}s · decoder runs ${(d[0].inferenceMs/1000).toFixed(1)}s / ${(d[1].inferenceMs/1000).toFixed(1)}s<br>Total ${(state.benchmark.totalMs/1000).toFixed(1)}s for ${d[0].audioDuration.toFixed(2)}s + ${d[1].audioDuration.toFixed(2)}s audio`;state.benchmark={...state.benchmark,outputs:undefined};$('benchmark-result').className='ok';status('Q4 benchmark complete','Compare both outputs with the FP32 Leo baseline');log('Q4 decoder benchmark completed.','ok');stop();setBusy(false)}catch(e){fail(e)}}
+$('copy').onclick=async()=>{const report={test:'Full Chatterbox 4-thread Q4 decoder warm benchmark',timestamp:new Date().toISOString(),device:{userAgent:navigator.userAgent,hardwareConcurrency:navigator.hardwareConcurrency,crossOriginIsolated:window.crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer!=='undefined'},settings:{maxTextChars:MAX_TEXT,temperature:.9,exaggeration:.5,cfgWeight:0,repetitionPenalty:1.2,minP:.05,maxReferenceSeconds:MAX_REF_SECONDS,decoderPrecision:'q4-weight-only',decoderSource:'BricksDisplay/chatterbox-multilingual-ONNX-q4'},init:state.init,leo:state.prepare,benchmark:state.benchmark,errors:state.errors};await navigator.clipboard.writeText(JSON.stringify(report,null,2));$('copy').textContent='Copied — paste into ChatGPT';setTimeout(()=>$('copy').textContent='Copy diagnostic report',2200)}
 $('reset').onclick=()=>{try{state.worker?.terminate()}catch{};if(state.refUrl)URL.revokeObjectURL(state.refUrl);state.outUrls.forEach(URL.revokeObjectURL);mark(null);location.reload()}
-const prev=localStorage.getItem('chatterboxWarmPhase');if(prev){try{const x=JSON.parse(prev);$('previous').hidden=false;$('previous').textContent=`Previous run stopped during “${x.phase}”. If you did not close the page, Safari likely terminated it under memory pressure.`}catch{}mark(null)}
+const prev=localStorage.getItem('chatterboxQ4DecoderPhase');if(prev){try{const x=JSON.parse(prev);$('previous').hidden=false;$('previous').textContent=`Previous run stopped during “${x.phase}”. If you did not close the page, Safari likely terminated it under memory pressure.`}catch{}mark(null)}
 showIsolation();setBusy(false)
 </script>
 </body>
