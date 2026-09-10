@@ -83,7 +83,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallbackDenylist: [/^\/nano-test(?:\.html)?$/],
+        navigateFallbackDenylist: [
+          /^\/nano-test(?:\.html)?$/,
+          /^\/chatterbox-full-test(?:\.html)?$/,
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,

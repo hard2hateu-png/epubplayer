@@ -6,7 +6,11 @@
       "destination": "/nano-test.html"
     },
     {
-      "source": "/((?!api|_next|static|public|nano-test(?:\\.html)?|nano-test\\.js|nano-test-worker\\.js|favicon\\.svg|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.png|.*\\.jpg|.*\\.epub).*)",
+      "source": "/chatterbox-full-test",
+      "destination": "/chatterbox-full-test.html"
+    },
+    {
+      "source": "/((?!api|_next|static|public|nano-test(?:\\.html)?|nano-test\\.js|nano-test-worker\\.js|chatterbox-full-test(?:\\.html)?|chatterbox-full-test\\.js|chatterbox-full-test-worker\\.js|favicon\\.svg|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|.*\\.png|.*\\.jpg|.*\\.epub).*)",
       "destination": "/index.html"
     }
   ],
@@ -69,6 +73,42 @@
     },
     {
       "source": "/nano-test-worker.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/chatterbox-full-test",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/chatterbox-full-test.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/chatterbox-full-test.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/chatterbox-full-test-worker.js",
       "headers": [
         {
           "key": "Cache-Control",

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Full Chatterbox iPhone Test</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b0d12; color: #f5f6f7; min-height: 100vh; }
+    main { width: min(760px, 100%); margin: 0 auto; padding: max(22px, env(safe-area-inset-top)) 18px max(40px, env(safe-area-inset-bottom)); }
+    h1 { font-size: 27px; line-height: 1.15; margin: 0 0 8px; }
+    h2 { font-size: 17px; margin: 0 0 12px; }
+    p { line-height: 1.45; color: #c7cbd2; }
+    .lede { margin-top: 0; }
+    .card { background: #151922; border: 1px solid #282e3a; border-radius: 18px; padding: 16px; margin: 14px 0; }
+    .notice { background: #191a20; border-left: 3px solid #747d90; padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; color: #d9dce1; }
+    .warnbox { background: #211b12; border-color: #564423; }
+    #previous-run { margin-top: 12px; }
+    #device-info { display: grid; gap: 7px; font-size: 14px; color: #cdd1d7; }
+    #device-info > span { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #242a35; padding-bottom: 7px; }
+    #device-info > span:last-child { border: 0; padding-bottom: 0; }
+    label { display: block; font-size: 13px; color: #aeb4bf; margin: 10px 0 6px; }
+    textarea, input[type="file"] { width: 100%; background: #0f1218; color: #f4f5f7; border: 1px solid #303746; border-radius: 12px; padding: 11px 12px; font: inherit; }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.4; }
+    button { width: 100%; border: 0; border-radius: 13px; padding: 13px 14px; font-size: 16px; font-weight: 650; background: #e8eaf0; color: #111318; margin-top: 10px; }
+    button.secondary { background: #252b36; color: #f3f4f6; }
+    button.danger { background: #322127; color: #ffdfe7; }
+    button:disabled { opacity: .4; }
+    body.busy button:not(#reset-button) { pointer-events: none; }
+    .status { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    #status-title { font-weight: 700; }
+    #status-detail { color: #9ea6b4; font-size: 13px; margin-top: 4px; line-height: 1.35; }
+    #elapsed { font-variant-numeric: tabular-nums; color: #c9ced7; font-size: 13px; min-width: 52px; text-align: right; }
+    .result { font-size: 14px; line-height: 1.4; margin-top: 10px; color: #bac0ca; }
+    .ok { color: #a9e9c2 !important; }
+    .warn { color: #f1d28d !important; }
+    .error { color: #ff9cae !important; }
+    audio { width: 100%; margin-top: 12px; }
+    #log { background: #090b0f; border: 1px solid #242a35; border-radius: 12px; padding: 10px; height: 180px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .log-row { color: #aeb5c1; margin-bottom: 5px; }
+    .log-row.ok { color: #90ddb0; }
+    .log-row.warn { color: #e6c36d; }
+    .log-row.error { color: #ff8ea3; }
+    small { display: block; color: #8f97a4; line-height: 1.4; margin-top: 8px; }
+    .step { color: #8d96a5; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .settings { display: grid; gap: 7px; margin-top: 12px; font-size: 14px; }
+    .settings div { display: flex; justify-content: space-between; gap: 12px; }
+    .count { text-align: right; color: #9ea6b4; font-size: 12px; margin-top: 5px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="step">Isolated diagnostic · preferred local path</div>
+    <h1>Full Chatterbox on iPhone</h1>
+    <p class="lede">This tests Resemble AI’s full Chatterbox ONNX model locally in Safari. It does not register a new reader engine or modify normal playback.</p>
+
+    <div class="notice warnbox">
+      This is a much larger test than Nano: roughly 1.5 GB of model files. Keep Safari in the foreground, use Wi‑Fi, and do not switch apps during the initial load. If Safari cannot hold it, we will use the remote full-Chatterbox fallback instead.
+    </div>
+    <div id="previous-run" class="notice warnbox" hidden></div>
+
+    <section class="card">
+      <h2>Device</h2>
+      <div id="device-info">Reading capabilities…</div>
+    </section>
+
+    <section class="card">
+      <h2>Current status</h2>
+      <div class="status">
+        <div>
+          <div id="status-title">Ready</div>
+          <div id="status-detail">Nothing has been downloaded yet.</div>
+        </div>
+        <div id="elapsed"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="step">1 · Leo reference</div>
+      <h2>Choose the same Leo sample</h2>
+      <p id="reference-status">Choose the 40–45 second Leo recording that worked in the official Chatterbox Space.</p>
+      <input id="file-input" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.flac" />
+      <div id="reference-wrap" hidden><audio id="reference-audio" controls preload="metadata"></audio></div>
+      <small>Up to 45 seconds is decoded locally to mono 24 kHz. The recording is never uploaded by this test.</small>
+    </section>
+
+    <section class="card">
+      <div class="step">2 · Model</div>
+      <h2>Load full Chatterbox</h2>
+      <button id="load-button">Load full Chatterbox locally</button>
+      <div id="model-result" class="result"></div>
+      <small>iPhone uses the WASM path for this first test. Model files are browser-cached after a successful download.</small>
+    </section>
+
+    <section class="card">
+      <div class="step">3 · Voice</div>
+      <h2>Encode Leo</h2>
+      <button id="prepare-button" disabled>Prepare Leo locally</button>
+      <div id="voice-result" class="result"></div>
+    </section>
+
+    <section class="card">
+      <div class="step">4 · Quality check</div>
+      <h2>Generate one ≤200-character sample</h2>
+      <div class="settings">
+        <div><span>Temperature</span><strong>0.9</strong></div>
+        <div><span>Exaggeration</span><strong>0.5</strong></div>
+        <div><span>Repetition penalty</span><strong>1.2</strong></div>
+        <div><span>CFG/Pace</span><strong>Not exposed in browser build</strong></div>
+      </div>
+      <label for="test-text">Test text</label>
+      <textarea id="test-text" maxlength="200"></textarea>
+      <div id="char-count" class="count">0/200</div>
+      <button id="generate-button" disabled>Generate with Leo</button>
+      <div id="generation-result" class="result"></div>
+      <div id="output-wrap" hidden><audio id="output-audio" controls preload="metadata"></audio></div>
+      <small>For this pass, do one generation only. Transformers.js 4.2.0 has a known repeated-generation cache issue; we only need voice quality and one-shot viability right now.</small>
+    </section>
+
+    <section class="card">
+      <h2>Diagnostic log</h2>
+      <div id="log"></div>
+      <button id="copy-button" class="secondary">Copy diagnostic report</button>
+      <button id="reset-button" class="danger">Reset test</button>
+    </section>
+  </main>
+  <script type="module">
+    const preview = new URLSearchParams(location.search).get('_preview')
+    const scriptUrl = new URL('/chatterbox-full-test.js', location.origin)
+    scriptUrl.searchParams.set('v', '20260910-full-a')
+    if (preview) scriptUrl.searchParams.set('_preview', preview)
+    await import(scriptUrl.href)
+  </script>
+</body>
+</html>
