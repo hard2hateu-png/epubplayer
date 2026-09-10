@@ -55,7 +55,7 @@ msgstr "{0} likely junk · {1} sections"
 #~ msgstr "{0} MB cached audio"
 
 #. placeholder {0}: settings.bufferAheadMinutes
-#: src/features/settings/SettingsPage.tsx:276
+#: src/features/settings/SettingsPage.tsx:259
 msgid "{0} min"
 msgstr "{0} min"
 
@@ -79,13 +79,13 @@ msgstr "{0} sections"
 msgid "{remainingMinutes} {0} remaining"
 msgstr "{remainingMinutes} {0} remaining"
 
-#: src/features/settings/SettingsPage.tsx:853
-#: src/features/settings/SettingsPage.tsx:862
-#: src/features/settings/SettingsPage.tsx:871
+#: src/features/settings/SettingsPage.tsx:791
+#: src/features/settings/SettingsPage.tsx:800
+#: src/features/settings/SettingsPage.tsx:809
 msgid "{s} seconds"
 msgstr "{s} seconds"
 
-#: src/features/settings/SettingsPage.tsx:374
+#: src/features/settings/SettingsPage.tsx:347
 msgid "⚠️ Browser TTS doesn't support background playback on mobile. Lock your screen and audio will stop. For background listening, use Supertonic or another AI voice."
 msgstr "⚠️ Browser TTS doesn't support background playback on mobile. Lock your screen and audio will stop. For background listening, use Supertonic or another AI voice."
 
@@ -93,9 +93,9 @@ msgstr "⚠️ Browser TTS doesn't support background playback on mobile. Lock y
 msgid "⚠️ CPU mode (slow)"
 msgstr "⚠️ CPU mode (slow)"
 
-#: src/features/settings/SettingsPage.tsx:42
-msgid "⚠️ Under development - may not work yet."
-msgstr "⚠️ Under development - may not work yet."
+#: src/features/settings/SettingsPage.tsx:38
+#~ msgid "⚠️ Under development - may not work yet."
+#~ msgstr "⚠️ Under development - may not work yet."
 
 #: src/features/discover/FindEbooksPage.tsx:239
 msgid "💡 Tip:"
@@ -105,14 +105,18 @@ msgstr "💡 Tip:"
 msgid "1 hour"
 msgstr "1 hour"
 
-#: src/features/settings/SettingsPage.tsx:386
-msgid "10 high-quality AI voices"
-msgstr "10 high-quality AI voices"
+#: src/features/settings/SettingsPage.tsx:308
+#~ msgid "10 high-quality AI voices"
+#~ msgstr "10 high-quality AI voices"
 
 #: src/features/player/useSleepTimer.ts:74
-#: src/features/settings/SettingsPage.tsx:142
+#: src/features/settings/SettingsPage.tsx:140
 msgid "10 minutes"
 msgstr "10 minutes"
+
+#: src/features/settings/SettingsPage.tsx:359
+msgid "10 voices"
+msgstr "10 voices"
 
 #: src/features/landing/LandingPage.tsx:27
 msgid "100% Free & Open Source"
@@ -122,12 +126,12 @@ msgstr "100% Free & Open Source"
 msgid "15 minutes"
 msgstr "15 minutes"
 
-#: src/features/settings/SettingsPage.tsx:141
+#: src/features/settings/SettingsPage.tsx:139
 msgid "3 minutes"
 msgstr "3 minutes"
 
 #: src/features/player/useSleepTimer.ts:76
-#: src/features/settings/SettingsPage.tsx:143
+#: src/features/settings/SettingsPage.tsx:141
 msgid "30 minutes"
 msgstr "30 minutes"
 
@@ -143,13 +147,21 @@ msgstr "5 minutes"
 msgid "70,000+ free books"
 msgstr "70,000+ free books"
 
-#: src/features/settings/SettingsPage.tsx:477
-msgid "8 lightweight AI voices"
-msgstr "8 lightweight AI voices"
+#: src/features/settings/SettingsPage.tsx:365
+#~ msgid "8 lightweight AI voices"
+#~ msgstr "8 lightweight AI voices"
 
-#: src/features/settings/SettingsPage.tsx:460
-msgid "900+ AI voices available"
-msgstr "900+ AI voices available"
+#: src/features/settings/SettingsPage.tsx:433
+msgid "8 voices"
+msgstr "8 voices"
+
+#: src/features/settings/SettingsPage.tsx:348
+#~ msgid "900+ AI voices available"
+#~ msgstr "900+ AI voices available"
+
+#: src/features/settings/SettingsPage.tsx:416
+msgid "900+ voices"
+msgstr "900+ voices"
 
 #: src/features/landing/LandingPage.tsx:40
 msgid "A beautiful audiobook player that transforms your EPUBs into listenable books with AI voices. Full player controls, bookmarks, sleep timer — everything runs locally on your device."
@@ -163,14 +175,18 @@ msgstr "A curated collection of public domain classics, well-organized by genre 
 msgid "A full audiobook player built with love for readers who want to listen. No strings attached."
 msgstr "A full audiobook player built with love for readers who want to listen. No strings attached."
 
-#: src/features/settings/SettingsPage.tsx:639
+#: src/features/settings/SettingsPage.tsx:595
 msgid "About"
 msgstr "About"
 
 #: src/features/accessibility/AccessibilityPage.tsx:46
-#: src/features/settings/SettingsPage.tsx:661
+#: src/features/settings/SettingsPage.tsx:616
 msgid "Accessibility"
 msgstr "Accessibility"
+
+#: src/features/settings/SettingsPage.tsx:604
+msgid "Active TTS"
+msgstr "Active TTS"
 
 #: src/ui/components/BookmarkSheet.tsx:108
 msgid "Add a note (optional)"
@@ -227,9 +243,9 @@ msgstr "AI TTS engine/model files"
 msgid "AI TTS speed and loading time depend on your device. Modern phones with WebGPU generally perform best."
 msgstr "AI TTS speed and loading time depend on your device. Modern phones with WebGPU generally perform best."
 
-#: src/features/settings/SettingsPage.tsx:36
-msgid "AI voice with great quality and speed. Works on most devices. ~260MB download."
-msgstr "AI voice with great quality and speed. Works on most devices. ~260MB download."
+#: src/features/settings/SettingsPage.tsx:34
+#~ msgid "AI voice with great quality and speed. Works on most devices. ~260MB download."
+#~ msgstr "AI voice with great quality and speed. Works on most devices. ~260MB download."
 
 #: src/features/import/SectionPreview.tsx:174
 #~ msgid "All content will be imported as a single chapter."
@@ -283,7 +299,7 @@ msgstr "Author Websites"
 msgid "Authors keep ~95% vs ~30%"
 msgstr "Authors keep ~95% vs ~30%"
 
-#: src/features/settings/SettingsPage.tsx:102
+#: src/features/settings/SettingsPage.tsx:100
 msgid "Auto"
 msgstr "Auto"
 
@@ -295,22 +311,26 @@ msgstr "Auto-Clean"
 #~ msgid "Auto-detected section boundary"
 #~ msgstr "Auto-detected section boundary"
 
-#: src/features/settings/SettingsPage.tsx:325
-#: src/features/settings/SettingsPage.tsx:870
-msgid "Auto-rewind on Resume"
-msgstr "Auto-rewind on Resume"
+#: src/features/settings/SettingsPage.tsx:278
+#: src/features/settings/SettingsPage.tsx:700
+#~ msgid "Auto-rewind on Resume"
+#~ msgstr "Auto-rewind on Resume"
 
 #: src/features/debug/DebugLogsPage.tsx:78
 #: src/features/editor/BookEditorPage.tsx:103
 #: src/features/help/HelpPage.tsx:47
 #: src/features/import/ImportPage.tsx:131
-#: src/features/settings/SettingsPage.tsx:298
+#: src/features/settings/SettingsPage.tsx:281
 msgid "Back"
 msgstr "Back"
 
-#: src/features/settings/SettingsPage.tsx:93
+#: src/features/settings/SettingsPage.tsx:91
 msgid "Balanced (q8)"
 msgstr "Balanced (q8)"
+
+#: src/features/settings/SettingsPage.tsx:91
+msgid "Balanced."
+msgstr "Balanced."
 
 #: src/features/discover/FindEbooksPage.tsx:45
 msgid "Beautifully formatted editions of public domain books. Each ebook is carefully typeset with professional covers and modernized punctuation."
@@ -320,13 +340,17 @@ msgstr "Beautifully formatted editions of public domain books. Each ebook is car
 msgid "Best formatting"
 msgstr "Best formatting"
 
-#: src/features/settings/SettingsPage.tsx:111
-msgid "Best performance — fast and smooth playback"
-msgstr "Best performance — fast and smooth playback"
+#: src/features/settings/SettingsPage.tsx:107
+#~ msgid "Best performance — fast and smooth playback"
+#~ msgstr "Best performance — fast and smooth playback"
 
-#: src/features/settings/SettingsPage.tsx:95
-msgid "Best quality, required for WebGPU"
-msgstr "Best quality, required for WebGPU"
+#: src/features/settings/SettingsPage.tsx:91
+#~ msgid "Best quality, required for WebGPU"
+#~ msgstr "Best quality, required for WebGPU"
+
+#: src/features/settings/SettingsPage.tsx:93
+msgid "Best quality."
+msgstr "Best quality."
 
 #: src/features/editor/BookEditorPage.tsx:70
 #: src/features/library/BookDetailPage.tsx:28
@@ -375,24 +399,26 @@ msgstr "Browse"
 msgid "Browse free ebooks →"
 msgstr "Browse free ebooks →"
 
-#: src/features/settings/SettingsPage.tsx:35
-msgid "Browser (Instant)"
-msgstr "Browser (Instant)"
+#: src/features/settings/SettingsPage.tsx:34
+msgid "Browser"
+msgstr "Browser"
+
+#: src/features/settings/SettingsPage.tsx:33
+#~ msgid "Browser (Instant)"
+#~ msgstr "Browser (Instant)"
 
 #: src/features/legal/TermsPage.tsx:133
 msgid "browser storage can be cleared by you, by your browser, or by the OS (e.g., low storage cleanup). Keep backups of any important files."
 msgstr "browser storage can be cleared by you, by your browser, or by the OS (e.g., low storage cleanup). Keep backups of any important files."
 
-#: src/features/settings/SettingsPage.tsx:396
-#: src/features/settings/SettingsPage.tsx:413
-#: src/features/settings/SettingsPage.tsx:430
-#: src/features/settings/SettingsPage.tsx:447
-#: src/features/settings/SettingsPage.tsx:464
-#: src/features/settings/SettingsPage.tsx:481
-#: src/features/settings/SettingsPage.tsx:509
-#: src/features/settings/SettingsPage.tsx:879
-msgid "Buffer Ahead"
-msgstr "Buffer Ahead"
+#: src/features/settings/SettingsPage.tsx:318
+#: src/features/settings/SettingsPage.tsx:335
+#: src/features/settings/SettingsPage.tsx:352
+#: src/features/settings/SettingsPage.tsx:369
+#: src/features/settings/SettingsPage.tsx:397
+#: src/features/settings/SettingsPage.tsx:709
+#~ msgid "Buffer Ahead"
+#~ msgstr "Buffer Ahead"
 
 #: src/features/player/usePlaybackAnnouncements.ts:108
 msgid "Buffering audio..."
@@ -402,6 +428,10 @@ msgstr "Buffering audio..."
 #: src/features/player/usePlaybackAnnouncements.ts:106
 msgid "Buffering: {0}% complete"
 msgstr "Buffering: {0}% complete"
+
+#: src/features/settings/SettingsPage.tsx:34
+msgid "Built-in device voice."
+msgstr "Built-in device voice."
 
 #: src/features/discover/FindEbooksPage.tsx:70
 msgid "Buy books you actually own — no DRM means you can read them in any app, on any device, forever."
@@ -459,15 +489,19 @@ msgstr "Chapters"
 msgid "Check for DRM-free badge"
 msgstr "Check for DRM-free badge"
 
-#: src/features/settings/SettingsPage.tsx:355
+#: src/features/settings/SettingsPage.tsx:328
 msgid "Checking…"
 msgstr "Checking…"
 
-#: src/features/settings/SettingsPage.tsx:337
-msgid "Choose speed vs quality"
-msgstr "Choose speed vs quality"
+#: src/features/settings/SettingsPage.tsx:320
+msgid "Choose a voice engine"
+msgstr "Choose a voice engine"
 
-#: src/features/settings/SettingsPage.tsx:578
+#: src/features/settings/SettingsPage.tsx:290
+#~ msgid "Choose speed vs quality"
+#~ msgstr "Choose speed vs quality"
+
+#: src/features/settings/SettingsPage.tsx:534
 msgid "chunks"
 msgstr "chunks"
 
@@ -483,11 +517,11 @@ msgstr "Clean All"
 msgid "Clear"
 msgstr "Clear"
 
-#: src/features/settings/SettingsPage.tsx:604
+#: src/features/settings/SettingsPage.tsx:560
 msgid "Clear All Audio"
 msgstr "Clear All Audio"
 
-#: src/features/settings/SettingsPage.tsx:611
+#: src/features/settings/SettingsPage.tsx:567
 msgid "Clear All Data"
 msgstr "Clear All Data"
 
@@ -497,7 +531,7 @@ msgid "Clear audio cache"
 msgstr "Clear audio cache"
 
 #. placeholder {0}: book.title
-#: src/features/settings/SettingsPage.tsx:585
+#: src/features/settings/SettingsPage.tsx:541
 msgid "Clear audio for {0}"
 msgstr "Clear audio for {0}"
 
@@ -531,8 +565,8 @@ msgstr "Continue Listening"
 msgid "Copy"
 msgstr "Copy"
 
-#: src/features/settings/SettingsPage.tsx:104
-#: src/features/settings/SettingsPage.tsx:112
+#: src/features/settings/SettingsPage.tsx:102
+#: src/features/settings/SettingsPage.tsx:110
 msgid "CPU (WASM)"
 msgstr "CPU (WASM)"
 
@@ -556,10 +590,6 @@ msgstr "current"
 msgid "Currently {currentSpeed}×"
 msgstr "Currently {currentSpeed}×"
 
-#: src/features/settings/SettingsPage.tsx:38
-msgid "Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use."
-msgstr "Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use."
-
 #: src/features/legal/TermsPage.tsx:132
 msgid "Data durability:"
 msgstr "Data durability:"
@@ -569,14 +599,14 @@ msgid "Debug"
 msgstr "Debug"
 
 #: src/features/debug/DebugLogsPage.tsx:80
-#: src/features/settings/SettingsPage.tsx:660
+#: src/features/settings/SettingsPage.tsx:615
 msgid "Debug Logs"
 msgstr "Debug Logs"
 
-#: src/features/settings/SettingsPage.tsx:310
-#: src/features/settings/SettingsPage.tsx:843
-msgid "Default Speed"
-msgstr "Default Speed"
+#: src/features/settings/SettingsPage.tsx:263
+#: src/features/settings/SettingsPage.tsx:673
+#~ msgid "Default Speed"
+#~ msgstr "Default Speed"
 
 #: src/features/library/BookDetailPage.tsx:67
 msgid "Delete all generated audio for this book? The book will remain in your library."
@@ -591,15 +621,23 @@ msgstr "Delete book"
 msgid "Delete bookmark: {0}"
 msgstr "Delete bookmark: {0}"
 
+#: src/features/settings/SettingsPage.tsx:568
+msgid "Delete books, audio, and settings"
+msgstr "Delete books, audio, and settings"
+
+#: src/features/settings/SettingsPage.tsx:561
+msgid "Delete generated audio"
+msgstr "Delete generated audio"
+
 #: src/features/import/SectionPreview.tsx:133
 #~ msgid "Detected Sections"
 #~ msgstr "Detected Sections"
 
-#: src/features/settings/SettingsPage.tsx:623
+#: src/features/settings/SettingsPage.tsx:579
 msgid "Device Sync"
 msgstr "Device Sync"
 
-#: src/features/settings/SettingsPage.tsx:871
+#: src/features/settings/SettingsPage.tsx:809
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -660,9 +698,9 @@ msgstr "DRM-Free Bookstores"
 msgid "Drop EPUB or PDF here"
 msgstr "Drop EPUB or PDF here"
 
-#: src/features/settings/SettingsPage.tsx:443
-msgid "Each voice is a different neural model"
-msgstr "Each voice is a different neural model"
+#: src/features/settings/SettingsPage.tsx:331
+#~ msgid "Each voice is a different neural model"
+#~ msgstr "Each voice is a different neural model"
 
 #: src/features/player/NowPlayingPage.tsx:765
 msgid "Edit"
@@ -682,13 +720,13 @@ msgstr "Edit sections"
 msgid "Edit Sections"
 msgstr "Edit Sections"
 
-#: src/features/settings/SettingsPage.tsx:145
-#: src/features/settings/SettingsPage.tsx:275
+#: src/features/settings/SettingsPage.tsx:143
+#: src/features/settings/SettingsPage.tsx:258
 msgid "Entire book (∞)"
 msgstr "Entire book (∞)"
 
-#: src/features/settings/SettingsPage.tsx:144
-#: src/features/settings/SettingsPage.tsx:274
+#: src/features/settings/SettingsPage.tsx:142
+#: src/features/settings/SettingsPage.tsx:257
 msgid "Entire chapter"
 msgstr "Entire chapter"
 
@@ -700,6 +738,10 @@ msgstr "Error"
 msgid "Error: {error}"
 msgstr "Error: {error}"
 
+#: src/features/settings/SettingsPage.tsx:40
+msgid "Experimental local voice."
+msgstr "Experimental local voice."
+
 #: src/features/debug/DebugLogsPage.tsx:150
 msgid "Export Logs"
 msgstr "Export Logs"
@@ -708,21 +750,30 @@ msgstr "Export Logs"
 msgid "Extracted book structure/text (for playback)"
 msgstr "Extracted book structure/text (for playback)"
 
-#: src/features/settings/SettingsPage.tsx:618
+#: src/features/settings/SettingsPage.tsx:574
 msgid "Failed to load storage info"
 msgstr "Failed to load storage info"
 
-#: src/features/settings/SettingsPage.tsx:112
-msgid "Fallback if WebGPU is unavailable"
-msgstr "Fallback if WebGPU is unavailable"
+#: src/features/settings/SettingsPage.tsx:108
+#~ msgid "Fallback if WebGPU is unavailable"
+#~ msgstr "Fallback if WebGPU is unavailable"
 
-#: src/features/settings/SettingsPage.tsx:92
+#: src/features/settings/SettingsPage.tsx:102
+#: src/features/settings/SettingsPage.tsx:110
+msgid "Fallback."
+msgstr "Fallback."
+
+#: src/features/settings/SettingsPage.tsx:90
 msgid "Fast (q4)"
 msgstr "Fast (q4)"
 
-#: src/features/settings/SettingsPage.tsx:103
-msgid "Fast but uses fp32 model (~80MB)"
-msgstr "Fast but uses fp32 model (~80MB)"
+#: src/features/settings/SettingsPage.tsx:99
+#~ msgid "Fast but uses fp32 model (~80MB)"
+#~ msgstr "Fast but uses fp32 model (~80MB)"
+
+#: src/features/settings/SettingsPage.tsx:35
+msgid "Fast local AI voice."
+msgstr "Fast local AI voice."
 
 #: src/ui/components/SpeedSheet.tsx:19
 msgid "Faster"
@@ -732,9 +783,14 @@ msgstr "Faster"
 msgid "Faster load times"
 msgstr "Faster load times"
 
-#: src/features/settings/SettingsPage.tsx:92
-msgid "Fastest, smallest (WASM only)"
-msgstr "Fastest, smallest (WASM only)"
+#: src/features/settings/SettingsPage.tsx:101
+#: src/features/settings/SettingsPage.tsx:109
+msgid "Faster."
+msgstr "Faster."
+
+#: src/features/settings/SettingsPage.tsx:88
+#~ msgid "Fastest, smallest (WASM only)"
+#~ msgstr "Fastest, smallest (WASM only)"
 
 #: src/features/import/ImportPage.tsx:393
 msgid "Fetch Article"
@@ -787,15 +843,7 @@ msgstr "Forward"
 msgid "Free Public Domain Books"
 msgstr "Free Public Domain Books"
 
-#: src/features/settings/SettingsPage.tsx:37
-msgid "Free/open-source Leo clone using a remote GPU such as a free Google Colab session."
-msgstr "Free/open-source Leo clone using a remote GPU such as a free Google Colab session."
-
-#: src/features/settings/SettingsPage.tsx:346
-msgid "Free/open-source Voicebox + Qwen3-TTS using a remote Colab GPU"
-msgstr "Free/open-source Voicebox + Qwen3-TTS using a remote Colab GPU"
-
-#: src/features/settings/SettingsPage.tsx:95
+#: src/features/settings/SettingsPage.tsx:93
 msgid "Full (fp32)"
 msgstr "Full (fp32)"
 
@@ -803,13 +851,18 @@ msgstr "Full (fp32)"
 msgid "Full-screen experience, no browser UI"
 msgstr "Full-screen experience, no browser UI"
 
+#: src/features/settings/SettingsPage.tsx:371
+#: src/features/settings/SettingsPage.tsx:388
+#: src/features/settings/SettingsPage.tsx:405
+#: src/features/settings/SettingsPage.tsx:422
+#: src/features/settings/SettingsPage.tsx:439
+#: src/features/settings/SettingsPage.tsx:467
+msgid "Generate upcoming audio"
+msgstr "Generate upcoming audio"
+
 #: src/features/legal/TermsPage.tsx:83
 msgid "Generated audio chunks (when using AI TTS that pre-generates audio)"
 msgstr "Generated audio chunks (when using AI TTS that pre-generates audio)"
-
-#: src/features/settings/SettingsPage.tsx:415
-msgid "Generated Voicebox audio is cached on this iPhone for smooth playback"
-msgstr "Generated Voicebox audio is cached on this iPhone for smooth playback"
 
 #: src/features/player/MiniPlayer.tsx:64
 msgid "Generating audio..."
@@ -842,13 +895,13 @@ msgstr "Go to book"
 msgid "Go to Library"
 msgstr "Go to Library"
 
-#: src/features/settings/SettingsPage.tsx:141
+#: src/features/settings/SettingsPage.tsx:139
 msgid "Good balance (less storage)"
 msgstr "Good balance (less storage)"
 
-#: src/features/settings/SettingsPage.tsx:93
-msgid "Good balance (WASM only)"
-msgstr "Good balance (WASM only)"
+#: src/features/settings/SettingsPage.tsx:89
+#~ msgid "Good balance (WASM only)"
+#~ msgstr "Good balance (WASM only)"
 
 #: src/features/discover/FindEbooksPage.tsx:58
 msgid "Great discovery"
@@ -858,9 +911,12 @@ msgstr "Great discovery"
 msgid "Half speed"
 msgstr "Half speed"
 
+#: src/features/settings/SettingsPage.tsx:617
+msgid "Help"
+msgstr "Help"
+
 #: src/features/help/HelpPage.tsx:52
 #: src/features/library/LibraryPage.tsx:142
-#: src/features/settings/SettingsPage.tsx:662
 msgid "Help & How it works"
 msgstr "Help & How it works"
 
@@ -869,17 +925,25 @@ msgstr "Help & How it works"
 msgid "Hide lyrics"
 msgstr "Hide lyrics"
 
-#: src/features/settings/SettingsPage.tsx:94
+#: src/features/settings/SettingsPage.tsx:92
 msgid "High (fp16)"
 msgstr "High (fp16)"
 
-#: src/features/settings/SettingsPage.tsx:94
-msgid "Higher quality (WASM only)"
-msgstr "Higher quality (WASM only)"
+#: src/features/settings/SettingsPage.tsx:38
+msgid "High-quality local AI voice."
+msgstr "High-quality local AI voice."
 
-#: src/features/settings/SettingsPage.tsx:40
-msgid "Highest quality AI voice. Requires powerful GPU for smooth playback."
-msgstr "Highest quality AI voice. Requires powerful GPU for smooth playback."
+#: src/features/settings/SettingsPage.tsx:90
+#~ msgid "Higher quality (WASM only)"
+#~ msgstr "Higher quality (WASM only)"
+
+#: src/features/settings/SettingsPage.tsx:92
+msgid "Higher quality."
+msgstr "Higher quality."
+
+#: src/features/settings/SettingsPage.tsx:36
+#~ msgid "Highest quality AI voice. Requires powerful GPU for smooth playback."
+#~ msgstr "Highest quality AI voice. Requires powerful GPU for smooth playback."
 
 #: src/features/pwa/InstallPromptSheet.tsx:92
 msgid "How to install"
@@ -918,7 +982,7 @@ msgstr "Import Failed"
 msgid "Import from another device"
 msgstr "Import from another device"
 
-#: src/features/settings/SettingsPage.tsx:632
+#: src/features/settings/SettingsPage.tsx:588
 msgid "Import Library"
 msgstr "Import Library"
 
@@ -958,11 +1022,7 @@ msgstr "Install app"
 msgid "Install Now"
 msgstr "Install Now"
 
-#: src/features/settings/SettingsPage.tsx:356
-msgid "Install or replace the private local Leo voice sample"
-msgstr "Install or replace the private local Leo voice sample"
-
-#: src/features/settings/SettingsPage.tsx:355
+#: src/features/settings/SettingsPage.tsx:328
 msgid "Installed"
 msgstr "Installed"
 
@@ -985,40 +1045,56 @@ msgstr "Jumped to {0}"
 msgid "Just import this page"
 msgstr "Just import this page"
 
-#: src/features/settings/SettingsPage.tsx:144
+#: src/features/settings/SettingsPage.tsx:142
 msgid "Keep generating until the chapter is fully cached"
 msgstr "Keep generating until the chapter is fully cached"
 
-#: src/features/settings/SettingsPage.tsx:398
-#: src/features/settings/SettingsPage.tsx:449
-#: src/features/settings/SettingsPage.tsx:466
-#: src/features/settings/SettingsPage.tsx:483
-#: src/features/settings/SettingsPage.tsx:511
-msgid "Keeps generating ahead even while paused"
-msgstr "Keeps generating ahead even while paused"
+#: src/features/settings/SettingsPage.tsx:320
+#: src/features/settings/SettingsPage.tsx:337
+#: src/features/settings/SettingsPage.tsx:354
+#: src/features/settings/SettingsPage.tsx:371
+#: src/features/settings/SettingsPage.tsx:399
+#~ msgid "Keeps generating ahead even while paused"
+#~ msgstr "Keeps generating ahead even while paused"
+
+#: src/features/settings/SettingsPage.tsx:616
+msgid "Keyboard and screen reader"
+msgstr "Keyboard and screen reader"
 
 #: src/features/player/useGlobalShortcuts.tsx:187
 msgid "Keyboard Shortcuts"
 msgstr "Keyboard Shortcuts"
 
-#: src/features/settings/SettingsPage.tsx:661
-msgid "Keyboard shortcuts, screen reader support"
-msgstr "Keyboard shortcuts, screen reader support"
+#: src/features/settings/SettingsPage.tsx:540
+#~ msgid "Keyboard shortcuts, screen reader support"
+#~ msgstr "Keyboard shortcuts, screen reader support"
 
-#: src/features/settings/SettingsPage.tsx:41
-msgid "Kitten (Light)"
-msgstr "Kitten (Light)"
+#: src/features/settings/SettingsPage.tsx:39
+msgid "Kitten"
+msgstr "Kitten"
+
+#: src/features/settings/SettingsPage.tsx:37
+#~ msgid "Kitten (Light)"
+#~ msgstr "Kitten (Light)"
+
+#: src/features/settings/SettingsPage.tsx:754
+msgid "Kitten Voice"
+msgstr "Kitten Voice"
 
 #: src/features/discover/FindEbooksPage.tsx:245
 msgid "Know another great source? This app is open source — feel free to suggest additions!"
 msgstr "Know another great source? This app is open source — feel free to suggest additions!"
 
-#: src/features/settings/SettingsPage.tsx:40
-msgid "Kokoro (Premium)"
-msgstr "Kokoro (Premium)"
+#: src/features/settings/SettingsPage.tsx:38
+msgid "Kokoro"
+msgstr "Kokoro"
 
-#: src/features/settings/SettingsPage.tsx:642
-#: src/features/settings/SettingsPage.tsx:683
+#: src/features/settings/SettingsPage.tsx:36
+#~ msgid "Kokoro (Premium)"
+#~ msgstr "Kokoro (Premium)"
+
+#: src/features/settings/SettingsPage.tsx:598
+#: src/features/settings/SettingsPage.tsx:633
 msgid "Language"
 msgstr "Language"
 
@@ -1038,18 +1114,30 @@ msgstr "Launches from your home screen"
 msgid "Learn More"
 msgstr "Learn More"
 
+#: src/features/settings/SettingsPage.tsx:36
+msgid "Leo custom voice on this device."
+msgstr "Leo custom voice on this device."
+
+#: src/features/settings/SettingsPage.tsx:327
+msgid "Leo Voice"
+msgstr "Leo Voice"
+
 #: src/features/library/LibraryPage.tsx:36
 #: src/ui/components/AppNav.tsx:16
 msgid "Library"
 msgstr "Library"
 
-#: src/features/settings/SettingsPage.tsx:664
+#: src/features/settings/SettingsPage.tsx:619
 msgid "License"
 msgstr "License"
 
-#: src/features/settings/SettingsPage.tsx:41
-msgid "Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download."
-msgstr "Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download."
+#: src/features/settings/SettingsPage.tsx:37
+#~ msgid "Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download."
+#~ msgstr "Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download."
+
+#: src/features/settings/SettingsPage.tsx:39
+msgid "Lightweight local AI voice."
+msgstr "Lightweight local AI voice."
 
 #: src/features/discover/BrowsePage.tsx:193
 msgid "Load more"
@@ -1064,9 +1152,9 @@ msgstr "Loading TTS engine..."
 msgid "Loading..."
 msgstr "Loading..."
 
-#: src/features/settings/SettingsPage.tsx:426
-msgid "Local custom Pocket TTS voice"
-msgstr "Local custom Pocket TTS voice"
+#: src/features/settings/SettingsPage.tsx:37
+msgid "Local multi-speaker voice."
+msgstr "Local multi-speaker voice."
 
 #: src/features/legal/TermsPage.tsx:78
 msgid "Local storage (what's saved)"
@@ -1092,6 +1180,10 @@ msgstr "Major publisher, DRM-free"
 msgid "Major sci-fi/fantasy publisher that sells all ebooks DRM-free. A rare example of a big publisher doing the right thing."
 msgstr "Major sci-fi/fantasy publisher that sells all ebooks DRM-free. A rare example of a big publisher doing the right thing."
 
+#: src/features/settings/SettingsPage.tsx:329
+msgid "Manage Pocket TTS voice"
+msgstr "Manage Pocket TTS voice"
+
 #: src/features/discover/FindEbooksPage.tsx:113
 msgid "Many authors sell directly from their websites or Patreon. Search for \"[author name] buy ebook direct\" — you'd be surprised how many offer this."
 msgstr "Many authors sell directly from their websites or Patreon. Search for \"[author name] buy ebook direct\" — you'd be surprised how many offer this."
@@ -1100,7 +1192,7 @@ msgstr "Many authors sell directly from their websites or Patreon. Search for \"
 msgid "Mark"
 msgstr "Mark"
 
-#: src/features/settings/SettingsPage.tsx:145
+#: src/features/settings/SettingsPage.tsx:143
 msgid "Maximum caching; may use lots of storage"
 msgstr "Maximum caching; may use lots of storage"
 
@@ -1112,10 +1204,10 @@ msgstr "Maybe later"
 msgid "Merge with Next"
 msgstr "Merge with Next"
 
-#: src/features/settings/SettingsPage.tsx:497
-#: src/features/settings/SettingsPage.tsx:825
-msgid "Model Quality"
-msgstr "Model Quality"
+#: src/features/settings/SettingsPage.tsx:385
+#: src/features/settings/SettingsPage.tsx:655
+#~ msgid "Model Quality"
+#~ msgstr "Model Quality"
 
 #: src/ui/components/SpeedSheet.tsx:20
 msgid "Much faster"
@@ -1137,9 +1229,9 @@ msgstr "Need EPUBs? Browse free ebooks →"
 msgid "Network use (what may be downloaded)"
 msgstr "Network use (what may be downloaded)"
 
-#: src/features/settings/SettingsPage.tsx:39
-msgid "Neural TTS with 900+ voices. Proper phonemization. ~100MB download."
-msgstr "Neural TTS with 900+ voices. Proper phonemization. ~100MB download."
+#: src/features/settings/SettingsPage.tsx:35
+#~ msgid "Neural TTS with 900+ voices. Proper phonemization. ~100MB download."
+#~ msgstr "Neural TTS with 900+ voices. Proper phonemization. ~100MB download."
 
 #: src/features/library/LibraryPage.tsx:142
 msgid "New here? Visit"
@@ -1170,7 +1262,7 @@ msgstr "No bookmarks yet"
 msgid "No books found for “{0}”"
 msgstr "No books found for “{0}”"
 
-#: src/features/settings/SettingsPage.tsx:597
+#: src/features/settings/SettingsPage.tsx:553
 msgid "No books in library"
 msgstr "No books in library"
 
@@ -1212,6 +1304,10 @@ msgstr "Off"
 msgid "on your device."
 msgstr "on your device."
 
+#: src/features/settings/SettingsPage.tsx:399
+msgid "One model per voice"
+msgstr "One model per voice"
+
 #: src/features/landing/LandingPage.tsx:50
 msgid "Open App"
 msgstr "Open App"
@@ -1239,10 +1335,6 @@ msgstr "Over 50,000 free ebooks. Includes both public domain classics and free c
 #: src/features/import/PagePicker.tsx:85
 msgid "pages selected"
 msgstr "pages selected"
-
-#: src/features/settings/SettingsPage.tsx:345
-msgid "Paired"
-msgstr "Paired"
 
 #: src/features/player/NowPlayingPage.tsx:304
 #: src/features/player/NowPlayingPage.tsx:555
@@ -1283,7 +1375,7 @@ msgstr "Pause"
 msgid "Paused"
 msgstr "Paused"
 
-#: src/features/settings/SettingsPage.tsx:559
+#: src/features/settings/SettingsPage.tsx:515
 msgid "Per-Book Storage"
 msgstr "Per-Book Storage"
 
@@ -1291,9 +1383,17 @@ msgstr "Per-Book Storage"
 msgid "Performance varies:"
 msgstr "Performance varies:"
 
-#: src/features/settings/SettingsPage.tsx:42
-msgid "Piper (Experimental)"
-msgstr "Piper (Experimental)"
+#: src/features/settings/SettingsPage.tsx:40
+msgid "Piper"
+msgstr "Piper"
+
+#: src/features/settings/SettingsPage.tsx:38
+#~ msgid "Piper (Experimental)"
+#~ msgstr "Piper (Experimental)"
+
+#: src/features/settings/SettingsPage.tsx:718
+msgid "Piper Voice"
+msgstr "Piper Voice"
 
 #: src/features/legal/TermsPage.tsx:59
 msgid "Plain-English summary"
@@ -1307,7 +1407,7 @@ msgstr "Play"
 msgid "Play / Pause"
 msgstr "Play / Pause"
 
-#: src/features/settings/SettingsPage.tsx:308
+#: src/features/settings/SettingsPage.tsx:291
 msgid "Playback"
 msgstr "Playback"
 
@@ -1337,13 +1437,13 @@ msgstr "Playback started"
 msgid "Playing"
 msgstr "Playing"
 
-#: src/features/settings/SettingsPage.tsx:354
-msgid "Pocket TTS — Leo"
-msgstr "Pocket TTS — Leo"
+#: src/features/settings/SettingsPage.tsx:36
+msgid "Pocket — Leo"
+msgstr "Pocket — Leo"
 
-#: src/features/settings/SettingsPage.tsx:38
-msgid "Pocket TTS (Leo)"
-msgstr "Pocket TTS (Leo)"
+#: src/features/settings/SettingsPage.tsx:382
+msgid "Pocket TTS"
+msgstr "Pocket TTS"
 
 #: src/features/discover/BrowsePage.tsx:129
 msgid "Popular on Project Gutenberg"
@@ -1352,6 +1452,16 @@ msgstr "Popular on Project Gutenberg"
 #: src/features/discover/FindEbooksPage.tsx:119
 msgid "Popular platform for creators selling directly. Many authors and publishers use it for DRM-free ebook sales."
 msgstr "Popular platform for creators selling directly. Many authors and publishers use it for DRM-free ebook sales."
+
+#: src/features/settings/SettingsPage.tsx:369
+#: src/features/settings/SettingsPage.tsx:386
+#: src/features/settings/SettingsPage.tsx:403
+#: src/features/settings/SettingsPage.tsx:420
+#: src/features/settings/SettingsPage.tsx:437
+#: src/features/settings/SettingsPage.tsx:465
+#: src/features/settings/SettingsPage.tsx:817
+msgid "Preload Audio"
+msgstr "Preload Audio"
 
 #: src/features/import/ImportPage.tsx:133
 #~ msgid "Preview"
@@ -1365,36 +1475,51 @@ msgstr "Popular platform for creators selling directly. Many authors and publish
 msgid "Previous chapter"
 msgstr "Previous chapter"
 
-#: src/features/settings/SettingsPage.tsx:390
-#: src/features/settings/SettingsPage.tsx:503
-#: src/features/settings/SettingsPage.tsx:834
-msgid "Processing Device"
-msgstr "Processing Device"
+#: src/features/settings/SettingsPage.tsx:312
+#: src/features/settings/SettingsPage.tsx:391
+#: src/features/settings/SettingsPage.tsx:664
+#~ msgid "Processing Device"
+#~ msgstr "Processing Device"
 
 #: src/features/discover/GutenbergBookSheet.tsx:225
 #: src/features/import/ImportPage.tsx:502
 msgid "Processing..."
 msgstr "Processing..."
 
+#: src/features/settings/SettingsPage.tsx:363
+#: src/features/settings/SettingsPage.tsx:459
+#: src/features/settings/SettingsPage.tsx:772
+msgid "Processor"
+msgstr "Processor"
+
+#: src/features/settings/SettingsPage.tsx:453
+#: src/features/settings/SettingsPage.tsx:763
+msgid "Quality"
+msgstr "Quality"
+
 #: src/features/player/usePlaybackAnnouncements.ts:54
 msgid "Ready to play"
 msgstr "Ready to play"
 
-#: src/features/settings/SettingsPage.tsx:633
+#: src/features/settings/SettingsPage.tsx:589
 msgid "Receive books from another device"
 msgstr "Receive books from another device"
+
+#: src/features/settings/SettingsPage.tsx:100
+msgid "Recommended."
+msgstr "Recommended."
 
 #: src/features/import/ImportPage.tsx:534
 msgid "Redirecting..."
 msgstr "Redirecting..."
 
-#: src/features/settings/SettingsPage.tsx:612
-msgid "Remove all books, audio, and settings"
-msgstr "Remove all books, audio, and settings"
+#: src/features/settings/SettingsPage.tsx:493
+#~ msgid "Remove all books, audio, and settings"
+#~ msgstr "Remove all books, audio, and settings"
 
-#: src/features/settings/SettingsPage.tsx:605
-msgid "Remove all generated audio to free up space"
-msgstr "Remove all generated audio to free up space"
+#: src/features/settings/SettingsPage.tsx:486
+#~ msgid "Remove all generated audio to free up space"
+#~ msgstr "Remove all generated audio to free up space"
 
 #: src/features/editor/BookEditorView.tsx:206
 msgid "Remove Flagged"
@@ -1403,6 +1528,11 @@ msgstr "Remove Flagged"
 #: src/features/editor/BookEditorView.tsx:343
 msgid "Remove section"
 msgstr "Remove section"
+
+#: src/features/settings/SettingsPage.tsx:308
+#: src/features/settings/SettingsPage.tsx:808
+msgid "Resume Rewind"
+msgstr "Resume Rewind"
 
 #: src/features/player/NowPlayingPage.tsx:382
 #: src/features/player/NowPlayingPage.tsx:449
@@ -1458,9 +1588,9 @@ msgstr "Select all"
 msgid "Select file to import"
 msgstr "Select file to import"
 
-#: src/features/settings/SettingsPage.tsx:816
-msgid "Select Kitten Voice"
-msgstr "Select Kitten Voice"
+#: src/features/settings/SettingsPage.tsx:646
+#~ msgid "Select Kitten Voice"
+#~ msgstr "Select Kitten Voice"
 
 #: src/features/import/PagePicker.tsx:99
 msgid "Select none"
@@ -1470,21 +1600,25 @@ msgstr "Select none"
 msgid "Select Pages"
 msgstr "Select Pages"
 
-#: src/features/settings/SettingsPage.tsx:780
-msgid "Select Piper Voice"
-msgstr "Select Piper Voice"
+#: src/features/settings/SettingsPage.tsx:610
+#~ msgid "Select Piper Voice"
+#~ msgstr "Select Piper Voice"
 
-#: src/features/settings/SettingsPage.tsx:807
-msgid "Select Sherpa Voice"
-msgstr "Select Sherpa Voice"
+#: src/features/settings/SettingsPage.tsx:637
+#~ msgid "Select Sherpa Voice"
+#~ msgstr "Select Sherpa Voice"
 
-#: src/features/settings/SettingsPage.tsx:789
-msgid "Select Supertonic Voice"
-msgstr "Select Supertonic Voice"
+#: src/features/settings/SettingsPage.tsx:619
+#~ msgid "Select Supertonic Voice"
+#~ msgstr "Select Supertonic Voice"
 
-#: src/features/settings/SettingsPage.tsx:768
-msgid "Select Voice"
-msgstr "Select Voice"
+#: src/features/settings/SettingsPage.tsx:598
+#~ msgid "Select Voice"
+#~ msgstr "Select Voice"
+
+#: src/features/settings/SettingsPage.tsx:583
+msgid "Send books to another device"
+msgstr "Send books to another device"
 
 #: src/features/library/LibraryPage.tsx:63
 msgid "Send to another device"
@@ -1494,12 +1628,11 @@ msgstr "Send to another device"
 msgid "Send to device"
 msgstr "Send to device"
 
-#: src/features/settings/SettingsPage.tsx:627
-msgid "Send your books to another device"
-msgstr "Send your books to another device"
+#: src/features/settings/SettingsPage.tsx:508
+#~ msgid "Send your books to another device"
+#~ msgstr "Send your books to another device"
 
-#: src/features/settings/SettingsPage.tsx:345
-#: src/features/settings/SettingsPage.tsx:355
+#: src/features/settings/SettingsPage.tsx:328
 msgid "Set up"
 msgstr "Set up"
 
@@ -1508,17 +1641,25 @@ msgstr "Set up"
 #: src/features/player/NowPlayingPage.tsx:302
 #: src/features/player/NowPlayingPage.tsx:303
 #: src/features/player/NowPlayingPage.tsx:705
-#: src/features/settings/SettingsPage.tsx:302
+#: src/features/settings/SettingsPage.tsx:285
 msgid "Settings"
 msgstr "Settings"
 
-#: src/features/settings/SettingsPage.tsx:626
+#: src/features/settings/SettingsPage.tsx:582
 msgid "Share Library"
 msgstr "Share Library"
 
-#: src/features/settings/SettingsPage.tsx:39
-msgid "Sherpa (Multi-Speaker)"
-msgstr "Sherpa (Multi-Speaker)"
+#: src/features/settings/SettingsPage.tsx:37
+msgid "Sherpa"
+msgstr "Sherpa"
+
+#: src/features/settings/SettingsPage.tsx:35
+#~ msgid "Sherpa (Multi-Speaker)"
+#~ msgstr "Sherpa (Multi-Speaker)"
+
+#: src/features/settings/SettingsPage.tsx:745
+msgid "Sherpa Voice"
+msgstr "Sherpa Voice"
 
 #: src/features/player/NowPlayingPage.tsx:329
 msgid "Show cover art"
@@ -1543,25 +1684,27 @@ msgstr "Showing {0} / {1}"
 msgid "Skip back"
 msgstr "Skip back"
 
-#: src/features/settings/SettingsPage.tsx:320
+#: src/features/settings/SettingsPage.tsx:303
+#: src/features/settings/SettingsPage.tsx:799
 msgid "Skip Back"
 msgstr "Skip Back"
 
-#: src/features/settings/SettingsPage.tsx:861
-msgid "Skip Back Interval"
-msgstr "Skip Back Interval"
+#: src/features/settings/SettingsPage.tsx:691
+#~ msgid "Skip Back Interval"
+#~ msgstr "Skip Back Interval"
 
 #: src/features/player/useGlobalShortcuts.tsx:25
 msgid "Skip forward"
 msgstr "Skip forward"
 
-#: src/features/settings/SettingsPage.tsx:315
+#: src/features/settings/SettingsPage.tsx:298
+#: src/features/settings/SettingsPage.tsx:790
 msgid "Skip Forward"
 msgstr "Skip Forward"
 
-#: src/features/settings/SettingsPage.tsx:852
-msgid "Skip Forward Interval"
-msgstr "Skip Forward Interval"
+#: src/features/settings/SettingsPage.tsx:682
+#~ msgid "Skip Forward Interval"
+#~ msgstr "Skip Forward Interval"
 
 #: src/App.tsx:74
 msgid "Skip to main content"
@@ -1594,15 +1737,19 @@ msgstr "Sleep Timer"
 msgid "Slightly faster"
 msgstr "Slightly faster"
 
-#: src/features/settings/SettingsPage.tsx:104
-msgid "Slow but supports smaller quantized models"
-msgstr "Slow but supports smaller quantized models"
+#: src/features/settings/SettingsPage.tsx:100
+#~ msgid "Slow but supports smaller quantized models"
+#~ msgstr "Slow but supports smaller quantized models"
 
 #: src/ui/components/SpeedSheet.tsx:16
 msgid "Slower"
 msgstr "Slower"
 
-#: src/features/settings/SettingsPage.tsx:142
+#: src/features/settings/SettingsPage.tsx:90
+msgid "Smallest."
+msgstr "Smallest."
+
+#: src/features/settings/SettingsPage.tsx:140
 msgid "Smoother playback"
 msgstr "Smoother playback"
 
@@ -1614,11 +1761,16 @@ msgstr "Smoother playback"
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
+#: src/features/settings/SettingsPage.tsx:293
+#: src/features/settings/SettingsPage.tsx:781
+msgid "Speed"
+msgstr "Speed"
+
 #: src/features/library/BookDetailPage.tsx:218
 msgid "Start Listening"
 msgstr "Start Listening"
 
-#: src/features/settings/SettingsPage.tsx:519
+#: src/features/settings/SettingsPage.tsx:475
 msgid "Storage"
 msgstr "Storage"
 
@@ -1626,13 +1778,25 @@ msgstr "Storage"
 #~ msgid "Storage Used"
 #~ msgstr "Storage Used"
 
-#: src/features/settings/SettingsPage.tsx:36
-msgid "Supertonic (Recommended)"
-msgstr "Supertonic (Recommended)"
+#: src/features/settings/SettingsPage.tsx:35
+msgid "Supertonic"
+msgstr "Supertonic"
 
-#: src/features/settings/SettingsPage.tsx:798
-msgid "Supertonic Processing Device"
-msgstr "Supertonic Processing Device"
+#: src/features/settings/SettingsPage.tsx:34
+#~ msgid "Supertonic (Recommended)"
+#~ msgstr "Supertonic (Recommended)"
+
+#: src/features/settings/SettingsPage.tsx:628
+#~ msgid "Supertonic Processing Device"
+#~ msgstr "Supertonic Processing Device"
+
+#: src/features/settings/SettingsPage.tsx:736
+msgid "Supertonic Processor"
+msgstr "Supertonic Processor"
+
+#: src/features/settings/SettingsPage.tsx:727
+msgid "Supertonic Voice"
+msgstr "Supertonic Voice"
 
 #: src/features/import/ImportPage.tsx:353
 msgid "Supported formats: EPUB, PDF (text-based and scanned)"
@@ -1646,7 +1810,7 @@ msgstr "Supports indie authors"
 msgid "Switch to Paste"
 msgstr "Switch to Paste"
 
-#: src/features/settings/SettingsPage.tsx:245
+#: src/features/settings/SettingsPage.tsx:228
 msgid "System Default"
 msgstr "System Default"
 
@@ -1675,7 +1839,7 @@ msgid "Technical detail: storage uses your browser's on-device database (Indexed
 msgstr "Technical detail: storage uses your browser's on-device database (IndexedDB). Storage quotas vary by device and browser."
 
 #: src/features/legal/TermsPage.tsx:50
-#: src/features/settings/SettingsPage.tsx:663
+#: src/features/settings/SettingsPage.tsx:618
 msgid "Terms & Privacy"
 msgstr "Terms & Privacy"
 
@@ -1683,7 +1847,7 @@ msgstr "Terms & Privacy"
 msgid "Terms & Privacy — EPUB Player"
 msgstr "Terms & Privacy — EPUB Player"
 
-#: src/features/settings/SettingsPage.tsx:332
+#: src/features/settings/SettingsPage.tsx:315
 msgid "Text-to-Speech"
 msgstr "Text-to-Speech"
 
@@ -1740,11 +1904,11 @@ msgstr "To make the app work offline and resume reliably, it stores data locally
 msgid "Try again"
 msgstr "Try again"
 
-#: src/features/settings/SettingsPage.tsx:335
-#: src/features/settings/SettingsPage.tsx:648
-#: src/features/settings/SettingsPage.tsx:696
-msgid "TTS Engine"
-msgstr "TTS Engine"
+#: src/features/settings/SettingsPage.tsx:288
+#: src/features/settings/SettingsPage.tsx:529
+#: src/features/settings/SettingsPage.tsx:564
+#~ msgid "TTS Engine"
+#~ msgstr "TTS Engine"
 
 #: src/features/editor/BookEditorView.tsx:259
 msgid "Undo"
@@ -1759,23 +1923,23 @@ msgstr "Undo"
 msgid "URL"
 msgstr "URL"
 
-#: src/features/settings/SettingsPage.tsx:102
-msgid "Use WebGPU if available, otherwise CPU (WASM)"
-msgstr "Use WebGPU if available, otherwise CPU (WASM)"
+#: src/features/settings/SettingsPage.tsx:98
+#~ msgid "Use WebGPU if available, otherwise CPU (WASM)"
+#~ msgstr "Use WebGPU if available, otherwise CPU (WASM)"
 
-#: src/features/settings/SettingsPage.tsx:432
-msgid "Uses the same generated-audio cache and iPhone safety limit"
-msgstr "Uses the same generated-audio cache and iPhone safety limit"
+#: src/features/settings/SettingsPage.tsx:455
+msgid "Used for CPU mode"
+msgstr "Used for CPU mode"
 
-#: src/features/settings/SettingsPage.tsx:35
-msgid "Uses your device's built-in voices. Fast and reliable."
-msgstr "Uses your device's built-in voices. Fast and reliable."
+#: src/features/settings/SettingsPage.tsx:33
+#~ msgid "Uses your device's built-in voices. Fast and reliable."
+#~ msgstr "Uses your device's built-in voices. Fast and reliable."
 
-#: src/features/settings/SettingsPage.tsx:646
+#: src/features/settings/SettingsPage.tsx:602
 msgid "Version"
 msgstr "Version"
 
-#: src/features/settings/SettingsPage.tsx:143
+#: src/features/settings/SettingsPage.tsx:141
 msgid "Very smooth, uses more storage"
 msgstr "Very smooth, uses more storage"
 
@@ -1788,36 +1952,33 @@ msgstr "View on GitHub"
 msgid "View on Project Gutenberg"
 msgstr "View on Project Gutenberg"
 
-#: src/features/settings/SettingsPage.tsx:660
-msgid "View/copy logs on mobile (including TTS worker)"
-msgstr "View/copy logs on mobile (including TTS worker)"
+#: src/features/settings/SettingsPage.tsx:615
+msgid "View or copy logs"
+msgstr "View or copy logs"
 
-#: src/features/settings/SettingsPage.tsx:366
-#: src/features/settings/SettingsPage.tsx:384
-#: src/features/settings/SettingsPage.tsx:407
-#: src/features/settings/SettingsPage.tsx:424
-#: src/features/settings/SettingsPage.tsx:441
-#: src/features/settings/SettingsPage.tsx:458
-#: src/features/settings/SettingsPage.tsx:475
-#: src/features/settings/SettingsPage.tsx:492
+#: src/features/settings/SettingsPage.tsx:539
+#~ msgid "View/copy logs on mobile (including TTS worker)"
+#~ msgstr "View/copy logs on mobile (including TTS worker)"
+
+#: src/features/settings/SettingsPage.tsx:339
+#: src/features/settings/SettingsPage.tsx:357
+#: src/features/settings/SettingsPage.tsx:380
+#: src/features/settings/SettingsPage.tsx:397
+#: src/features/settings/SettingsPage.tsx:414
+#: src/features/settings/SettingsPage.tsx:431
+#: src/features/settings/SettingsPage.tsx:448
+#: src/features/settings/SettingsPage.tsx:706
 msgid "Voice"
 msgstr "Voice"
 
-#: src/features/settings/SettingsPage.tsx:426
-msgid "Voice sample required"
-msgstr "Voice sample required"
+#: src/features/settings/SettingsPage.tsx:318
+#: src/features/settings/SettingsPage.tsx:646
+msgid "Voice Engine"
+msgstr "Voice Engine"
 
-#: src/features/settings/SettingsPage.tsx:344
-msgid "Voicebox — Leo"
-msgstr "Voicebox — Leo"
-
-#: src/features/settings/SettingsPage.tsx:37
-msgid "Voicebox + Qwen3-TTS (Leo)"
-msgstr "Voicebox + Qwen3-TTS (Leo)"
-
-#: src/features/settings/SettingsPage.tsx:409
-msgid "Voicebox Qwen3-TTS 1.7B clone"
-msgstr "Voicebox Qwen3-TTS 1.7B clone"
+#: src/features/settings/SettingsPage.tsx:382
+msgid "Voice sample needed"
+msgstr "Voice sample needed"
 
 #: src/features/legal/TermsPage.tsx:148
 msgid "Want a friendly walkthrough? See <0>Help & How it works</0>."
@@ -1839,22 +2000,30 @@ msgstr "We've curated options that respect readers: public domain works are free
 #~ msgid "Web Article"
 #~ msgstr "Web Article"
 
-#: src/features/settings/SettingsPage.tsx:103
-#: src/features/settings/SettingsPage.tsx:111
+#: src/features/settings/SettingsPage.tsx:101
+#: src/features/settings/SettingsPage.tsx:109
 msgid "WebGPU (GPU)"
 msgstr "WebGPU (GPU)"
 
-#: src/features/settings/SettingsPage.tsx:499
-msgid "WebGPU always uses fp32; quantized models are WASM-only"
-msgstr "WebGPU always uses fp32; quantized models are WASM-only"
+#: src/features/settings/SettingsPage.tsx:387
+#~ msgid "WebGPU always uses fp32; quantized models are WASM-only"
+#~ msgstr "WebGPU always uses fp32; quantized models are WASM-only"
 
-#: src/features/settings/SettingsPage.tsx:505
-msgid "WebGPU is fastest when supported"
-msgstr "WebGPU is fastest when supported"
+#: src/features/settings/SettingsPage.tsx:461
+msgid "WebGPU is faster"
+msgstr "WebGPU is faster"
 
-#: src/features/settings/SettingsPage.tsx:392
-msgid "WebGPU is fastest; WASM is fallback for older devices"
-msgstr "WebGPU is fastest; WASM is fallback for older devices"
+#: src/features/settings/SettingsPage.tsx:393
+#~ msgid "WebGPU is fastest when supported"
+#~ msgstr "WebGPU is fastest when supported"
+
+#: src/features/settings/SettingsPage.tsx:314
+#~ msgid "WebGPU is fastest; WASM is fallback for older devices"
+#~ msgstr "WebGPU is fastest; WASM is fallback for older devices"
+
+#: src/features/settings/SettingsPage.tsx:365
+msgid "WebGPU or WASM"
+msgstr "WebGPU or WASM"
 
 #: src/features/discover/FindEbooksPage.tsx:240
 msgid "When downloading, look for the <0>EPUB</0> format (not Kindle/MOBI or PDF). EPUBs work best for text-to-speech since they're reflowable text."

@@ -85,7 +85,7 @@ export function PocketVoiceSetupSheet({
     try {
       await activateLeo()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not activate Pocket TTS — Leo.')
+      setError(err instanceof Error ? err.message : 'Could not activate Leo Voice.')
       setBusy(false)
     }
   }
@@ -101,10 +101,10 @@ export function PocketVoiceSetupSheet({
       setInstalled(true)
       onInstalledChange?.(true)
       setMessage(
-        'Preparing Leo from the complete reference. The first preparation can take a while; later launches reuse the saved voice fingerprint.'
+        'Preparing Leo. First setup can take a while.'
       )
       await pocketService.initialize()
-      setMessage('Leo is ready. Activating Pocket TTS…')
+      setMessage('Leo is ready.')
       await activateLeo()
     } catch (err) {
       setError(
@@ -135,7 +135,7 @@ export function PocketVoiceSetupSheet({
         return
       }
 
-      setMessage('Leo voice reference and saved fingerprint were removed from this device.')
+      setMessage('Leo was removed from this device.')
     } catch (err) {
       setError(
         err instanceof Error
@@ -172,10 +172,10 @@ export function PocketVoiceSetupSheet({
               id="pocket-leo-setup-title"
               className="text-lg font-semibold text-text-primary"
             >
-              Pocket TTS — Leo
+              Leo Voice
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Private custom voice stored only on this device.
+              Pocket TTS on this device.
             </p>
           </div>
           <button
@@ -203,9 +203,7 @@ export function PocketVoiceSetupSheet({
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Pocket TTS uses the complete stored Leo clip—up to 42 seconds—instead
-              of choosing only the loudest 10-second section. The previous app's saved
-              reference is recovered automatically when available.
+              Uses your saved Leo reference on this device.
             </p>
           </div>
 
@@ -222,21 +220,19 @@ export function PocketVoiceSetupSheet({
 
           {active && (
             <div className="rounded-xl bg-accent/10 px-4 py-3">
-              <p className="text-sm font-medium text-text-primary">Leo is the active voice</p>
+              <p className="text-sm font-medium text-text-primary">Leo is active</p>
               <p className="mt-1 text-xs leading-relaxed text-text-muted">
-                TTS Engine is Pocket TTS and the reader voice is Leo.
+                Pocket TTS is selected.
               </p>
             </div>
           )}
 
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <p className="text-sm font-medium text-text-primary">
-              Faster after the first preparation
+              Saved locally
             </p>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              The first run creates a compact Leo voice fingerprint. It stays on this
-              device, so later launches skip re-analyzing the full audio and avoid
-              loading the extra voice-encoder model.
+              After first setup, Leo starts faster.
             </p>
           </div>
 
@@ -247,8 +243,8 @@ export function PocketVoiceSetupSheet({
               {busy
                 ? 'Preparing Leo…'
                 : installed
-                  ? 'Replace Leo reference'
-                  : 'Install Leo reference'}
+                  ? 'Replace Leo'
+                  : 'Install Leo'}
             </span>
             <input
               type="file"
@@ -270,7 +266,7 @@ export function PocketVoiceSetupSheet({
               onClick={() => void handleRemove()}
               className="pressable min-h-11 w-full rounded-xl bg-surface-2 px-4 py-3 text-sm font-medium text-error disabled:opacity-50"
             >
-              Remove Leo reference
+              Remove Leo
             </button>
           )}
 
@@ -287,9 +283,7 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            Pocket TTS still downloads its on-device model files the first time.
-            The reference, model files, and prepared fingerprint remain in browser
-            storage for later use.
+            Pocket downloads its model once and keeps it on this device.
           </p>
         </div>
       </div>

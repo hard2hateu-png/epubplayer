@@ -16,7 +16,6 @@ import { supertonicService } from './supertonicService'
 import { sherpaService } from './sherpaService'
 import { kittenService } from './kittenService'
 import { pocketService } from './pocketService'
-import { voiceboxRemoteService } from './voiceboxRemoteService'
 import type {
   TTSEngine,
   TTSEngineInfo,
@@ -64,17 +63,6 @@ const ENGINE_REGISTRY: Record<TTSEngine, TTSEngineInfo> = {
       generatesBlobs: true,   // Pre-generates WAV blobs
       requiresInit: true,     // Needs model loading
       slowOnCPU: false,       // Fast on both WebGPU and WASM
-    },
-  },
-  voicebox: {
-    id: 'voicebox',
-    name: 'Voicebox (Leo)',
-    description: 'Free/open-source Voicebox + Qwen3-TTS on a remote GPU such as Google Colab.',
-    available: true,
-    capabilities: {
-      generatesBlobs: true,
-      requiresInit: true,
-      slowOnCPU: false,
     },
   },
   pocket: {
@@ -152,7 +140,6 @@ class TTSManager {
   private isInitialized = false
   private isInitializing = false
   private initPromise: Promise<void> | null = null
-  private initGeneration = 0
 
   // Callbacks
   private onAudioCallback?: AudioCallback
@@ -224,16 +211,14 @@ class TTSManager {
       return this.initPromise
     }
 
-    const generation = this.initGeneration
     this.isInitializing = true
-    this.initPromise = this.doInitialize(generation)
+    this.initPromise = this.doInitialize()
     return this.initPromise
   }
 
-  private async doInitialize(generation: number): Promise<void> {
+  private async doInitialize(): Promise<void> {
     try {
       const engine = await settingsRepository.get('ttsEngine')
-      if (generation !== this.initGeneration) return
       this.currentEngine = engine
 
       log.info('Initializing engine', { engine })
@@ -278,26 +263,15 @@ class TTSManager {
           await pocketService.initialize()
           break
 
-        case 'voicebox':
-          this.wireUpService(voiceboxRemoteService, 'voicebox')
-          await voiceboxRemoteService.initialize()
-          break
-
         case 'browser':
           // Browser TTS doesn't need initialization
           break
       }
 
-      if (generation !== this.initGeneration) {
-        log.debug('Ignoring stale TTS initialization completion', { engine })
-        return
-      }
       this.markReady()
     } catch (error) {
-      if (generation === this.initGeneration) {
-        this.isInitializing = false
-        this.initPromise = null
-      }
+      this.isInitializing = false
+      this.initPromise = null
       throw error
     }
   }
@@ -425,17 +399,6 @@ class TTSManager {
           }
         }
 
-        case 'voicebox': {
-          const result = await voiceboxRemoteService.generateChunk(text, chunkIndex)
-          return {
-            requestId: result.requestId,
-            blob: result.blob,
-            duration: result.duration,
-            chunkIndex: result.chunkIndex,
-            text: result.text,
-          }
-        }
-
         default:
           throw new Error(`Unknown TTS engine: ${this.currentEngine}`)
       }
@@ -460,8 +423,6 @@ class TTSManager {
         return kittenService.splitIntoChunks(text)
       case 'pocket':
         return pocketService.splitIntoChunks(text)
-      case 'voicebox':
-        return voiceboxRemoteService.splitIntoChunks(text)
       default:
         return kokoroTTS.splitIntoChunks(text)
     }
@@ -514,9 +475,6 @@ class TTSManager {
       case 'pocket':
         pocketService.cancelAll()
         break
-      case 'voicebox':
-        voiceboxRemoteService.cancelAll()
-        break
     }
   }
 
@@ -540,14 +498,8 @@ class TTSManager {
       case 'pocket':
         pocketService.destroy()
         break
-      case 'voicebox':
-        voiceboxRemoteService.destroy()
-        break
     }
-    this.initGeneration += 1
     this.isInitialized = false
-    this.isInitializing = false
-    this.initPromise = null
   }
 
   async setEngine(engine: TTSEngine): Promise<void> {

@@ -4,9 +4,8 @@ import { Trans } from '@lingui/react/macro'
 import { t } from '@lingui/core/macro'
 import { useStorageStats } from './useStorageStats'
 import { PocketVoiceSetupSheet } from './PocketVoiceSetupSheet'
-import { VoiceboxRemoteSetupSheet } from './VoiceboxRemoteSetupSheet'
 import { settingsRepository, DEFAULT_SETTINGS, type SettingKey } from '@/services/storage/settingsRepository'
-import { ttsManager, pocketService, voiceboxRemoteService, type TTSEngine } from '@/services/tts'
+import { ttsManager, pocketService, type TTSEngine } from '@/services/tts'
 import { PIPER_MODELS } from '@/services/tts/piperService'
 import { SUPERTONIC_VOICES } from '@/services/tts/supertonicService'
 import { SHERPA_VOICES } from '@/services/tts/sherpaService'
@@ -32,14 +31,13 @@ function getBrowserVoices(): { id: string; name: string }[] {
 // Note: These are defined as a function to support i18n translations
 function getTTSEngines() {
   return [
-    { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
-    { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
-    { id: 'voicebox' as TTSEngine, name: t`Voicebox + Qwen3-TTS (Leo)`, description: t`Free/open-source Leo clone using a remote GPU such as a free Kaggle session.` },
-    { id: 'pocket' as TTSEngine, name: t`Pocket TTS (Leo)`, description: t`Custom on-device Leo voice clone. Requires a local voice sample and downloads its model on first use.` },
-    { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
-    { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
-    { id: 'kitten' as TTSEngine, name: t`Kitten (Light)`, description: t`Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download.` },
-    { id: 'piper' as TTSEngine, name: t`Piper (Experimental)`, description: t`⚠️ Under development - may not work yet.` },
+    { id: 'browser' as TTSEngine, name: t`Browser`, description: t`Built-in device voice.` },
+    { id: 'supertonic' as TTSEngine, name: t`Supertonic`, description: t`Fast local AI voice.` },
+    { id: 'pocket' as TTSEngine, name: t`Pocket — Leo`, description: t`Leo custom voice on this device.` },
+    { id: 'sherpa' as TTSEngine, name: t`Sherpa`, description: t`Local multi-speaker voice.` },
+    { id: 'kokoro' as TTSEngine, name: t`Kokoro`, description: t`High-quality local AI voice.` },
+    { id: 'kitten' as TTSEngine, name: t`Kitten`, description: t`Lightweight local AI voice.` },
+    { id: 'piper' as TTSEngine, name: t`Piper`, description: t`Experimental local voice.` },
   ]
 }
 
@@ -89,27 +87,27 @@ const KITTEN_VOICE_OPTIONS = KITTEN_VOICES.map((v) => ({
 // Note: WebGPU forces fp32 for compatibility, so these only affect WASM mode
 function getModelConfigs() {
   return [
-    { id: 'q4', name: t`Fast (q4)`, description: t`Fastest, smallest (WASM only)` },
-    { id: 'q8', name: t`Balanced (q8)`, description: t`Good balance (WASM only)` },
-    { id: 'fp16', name: t`High (fp16)`, description: t`Higher quality (WASM only)` },
-    { id: 'fp32', name: t`Full (fp32)`, description: t`Best quality, required for WebGPU` },
+    { id: 'q4', name: t`Fast (q4)`, description: t`Smallest.` },
+    { id: 'q8', name: t`Balanced (q8)`, description: t`Balanced.` },
+    { id: 'fp16', name: t`High (fp16)`, description: t`Higher quality.` },
+    { id: 'fp32', name: t`Full (fp32)`, description: t`Best quality.` },
   ]
 }
 
 // Processing device options (for Kokoro)
 function getProcessingDevices() {
   return [
-    { id: 'auto', name: t`Auto`, description: t`Use WebGPU if available, otherwise CPU (WASM)` },
-    { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Fast but uses fp32 model (~80MB)` },
-    { id: 'wasm', name: t`CPU (WASM)`, description: t`Slow but supports smaller quantized models` },
+    { id: 'auto', name: t`Auto`, description: t`Recommended.` },
+    { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Faster.` },
+    { id: 'wasm', name: t`CPU (WASM)`, description: t`Fallback.` },
   ]
 }
 
 // Processing device options (for Supertonic)
 function getSupertonicDevices() {
   return [
-    { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Best performance — fast and smooth playback` },
-    { id: 'wasm', name: t`CPU (WASM)`, description: t`Fallback if WebGPU is unavailable` },
+    { id: 'webgpu', name: t`WebGPU (GPU)`, description: t`Faster.` },
+    { id: 'wasm', name: t`CPU (WASM)`, description: t`Fallback.` },
   ]
 }
 
@@ -129,11 +127,11 @@ function isIOSDevice(): boolean {
 function getBufferAheadChoices() {
   if (isIOSDevice()) {
     return [
-      { id: 'minutes:3', label: 'Up to 3 min / 12 chunks', description: 'Buffers about 3 minutes ahead, with a 12-chunk iPhone safety limit' },
-      { id: 'minutes:10', label: 'Up to 10 min / 12 chunks', description: 'Buffers until 10 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first' },
-      { id: 'minutes:30', label: 'Up to 30 min / 12 chunks', description: 'Buffers until 30 minutes ahead or the 12-chunk iPhone safety limit, whichever comes first' },
-      { id: 'chapter', label: 'Chapter + transition', description: 'Buffers up to 12 chunks from this chapter; if there is room, also readies up to 3 chunks from the next chapter' },
-      { id: 'book', label: 'Next 12 chunks', description: 'Keeps up to 12 chunks ready in the current chapter' },
+      { id: 'minutes:3', label: '3 min / 12 max', description: 'About 3 minutes ahead.' },
+      { id: 'minutes:10', label: '10 min / 12 max', description: 'Up to 10 minutes ahead.' },
+      { id: 'minutes:30', label: '30 min / 12 max', description: 'Up to 30 minutes ahead.' },
+      { id: 'chapter', label: 'Chapter / 12 max', description: 'Current chapter, up to 12 chunks.' },
+      { id: 'book', label: 'Next 12 chunks', description: 'Current chapter only.' },
     ]
   }
 
@@ -157,25 +155,6 @@ export function SettingsPage() {
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [browserVoices, setBrowserVoices] = useState<{ id: string; name: string }[]>([])
   const [pocketVoiceInstalled, setPocketVoiceInstalled] = useState<boolean | null>(null)
-
-  // One-tap pairing from the free Colab notebook. URL fragments stay client-side.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '')
-    const voiceboxUrl = params.get('voiceboxUrl')
-    const voiceboxToken = params.get('voiceboxToken')
-    if (!voiceboxUrl || !voiceboxToken) return
-    try {
-      voiceboxRemoteService.configure(voiceboxUrl, voiceboxToken)
-      ttsManager.destroy()
-      void playbackController.reloadTTSSettings().catch((e) => {
-        console.warn('[Settings] Failed to apply new Voicebox pairing:', e)
-      })
-      setActiveSheet('voiceboxLeo')
-      window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    } catch {
-      // Leave manual fields available in the setup sheet if pairing data is malformed.
-    }
-  }, [])
 
   // Load settings on mount
   useEffect(() => {
@@ -242,7 +221,7 @@ export function SettingsPage() {
   }
 
   const getVoiceName = (id: string) => {
-    if (settings.ttsEngine === 'pocket' || settings.ttsEngine === 'voicebox') {
+    if (settings.ttsEngine === 'pocket') {
       return 'Leo'
     }
     if (settings.ttsEngine === 'browser') {
@@ -271,9 +250,9 @@ export function SettingsPage() {
   const getSupertonicDeviceName = (id: string) => getSupertonicDevices().find((d) => d.id === id)?.name || id
   const getBufferAheadLabel = () => {
     if (isIOSDevice()) {
-      if (settings.bufferAheadMode === 'chapter') return 'Chapter + transition'
+      if (settings.bufferAheadMode === 'chapter') return 'Chapter / 12 max'
       if (settings.bufferAheadMode === 'book') return 'Next 12 chunks'
-      return 'Up to ' + settings.bufferAheadMinutes + ' min / 12 chunks'
+      return settings.bufferAheadMinutes + ' min / 12 max'
     }
     if (settings.bufferAheadMode === 'chapter') return t`Entire chapter`
     if (settings.bufferAheadMode === 'book') return t`Entire book (∞)`
@@ -311,7 +290,7 @@ export function SettingsPage() {
         {/* Playback settings */}
         <SettingsGroup title={t`Playback`}>
           <SettingsItem
-            label={t`Default Speed`}
+            label={t`Speed`}
             value={`${settings.defaultSpeed}×`}
             onClick={() => setActiveSheet('speed')}
           />
@@ -326,7 +305,7 @@ export function SettingsPage() {
             onClick={() => setActiveSheet('skipBack')}
           />
           <SettingsItem
-            label={t`Auto-rewind on Resume`}
+            label={t`Resume Rewind`}
             value={`${settings.autoRewindSeconds}s`}
             onClick={() => setActiveSheet('autoRewind')}
           />
@@ -336,28 +315,18 @@ export function SettingsPage() {
         <SettingsGroup title={t`Text-to-Speech`}>
           <SettingsItem
             icon={<HeadphonesIcon className="h-5 w-5" />}
-            label={t`TTS Engine`}
+            label={t`Voice Engine`}
             value={getEngineName(settings.ttsEngine)}
-            description={t`Choose speed vs quality`}
+            description={t`Choose a voice engine`}
             onClick={() => setActiveSheet('ttsEngine')}
           />
-
-          {settings.ttsEngine !== 'voicebox' && (
-            <SettingsItem
-              icon={<VolumeIcon className="h-5 w-5" />}
-              label={t`Voicebox — Leo`}
-              value={voiceboxRemoteService.hasConfig() ? t`Paired` : t`Set up`}
-              description={t`Free/open-source Voicebox + Qwen3-TTS using a remote Colab GPU`}
-              onClick={() => setActiveSheet('voiceboxLeo')}
-            />
-          )}
 
           {settings.ttsEngine !== 'pocket' && (
             <SettingsItem
               icon={<VolumeIcon className="h-5 w-5" />}
-              label={t`Pocket TTS — Leo`}
+              label={t`Leo Voice`}
               value={pocketVoiceInstalled === null ? t`Checking…` : pocketVoiceInstalled ? t`Installed` : t`Set up`}
-              description={t`Install or replace the private local Leo voice sample`}
+              description={t`Manage Pocket TTS voice`}
               onClick={() => setActiveSheet('pocketLeo')}
             />
           )}
@@ -387,36 +356,19 @@ export function SettingsPage() {
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value={getSupertonicVoiceName(settings.supertonicVoice)}
-                description={t`10 high-quality AI voices`}
+                description={t`10 voices`}
                 onClick={() => setActiveSheet('supertonicVoice')}
               />
               <SettingsItem
-                label={t`Processing Device`}
+                label={t`Processor`}
                 value={getSupertonicDeviceName(settings.supertonicDevice)}
-                description={t`WebGPU is fastest; WASM is fallback for older devices`}
+                description={t`WebGPU or WASM`}
                 onClick={() => setActiveSheet('supertonicDevice')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Keeps generating ahead even while paused`}
-                onClick={() => setActiveSheet('bufferAhead')}
-              />
-            </>
-          )}
-          {settings.ttsEngine === 'voicebox' && (
-            <>
-              <SettingsItem
-                icon={<VolumeIcon className="h-5 w-5" />}
-                label={t`Voice`}
-                value="Leo"
-                description={t`Voicebox Qwen3-TTS 1.7B clone`}
-                onClick={() => setActiveSheet('voiceboxLeo')}
-              />
-              <SettingsItem
-                label={t`Buffer Ahead`}
-                value={getBufferAheadLabel()}
-                description={t`Generated Voicebox audio is cached on this iPhone for smooth playback`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -427,13 +379,13 @@ export function SettingsPage() {
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value="Leo"
-                description={pocketVoiceInstalled ? t`Local custom Pocket TTS voice` : t`Voice sample required`}
+                description={pocketVoiceInstalled ? t`Pocket TTS` : t`Voice sample needed`}
                 onClick={() => setActiveSheet('pocketLeo')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Uses the same generated-audio cache and iPhone safety limit`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -444,13 +396,13 @@ export function SettingsPage() {
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value={getPiperModelName(settings.piperModel)}
-                description={t`Each voice is a different neural model`}
+                description={t`One model per voice`}
                 onClick={() => setActiveSheet('piperModel')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Keeps generating ahead even while paused`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -461,13 +413,13 @@ export function SettingsPage() {
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value={getSherpaVoiceName(settings.sherpaVoice)}
-                description={t`900+ AI voices available`}
+                description={t`900+ voices`}
                 onClick={() => setActiveSheet('sherpaVoice')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Keeps generating ahead even while paused`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -478,13 +430,13 @@ export function SettingsPage() {
                 icon={<VolumeIcon className="h-5 w-5" />}
                 label={t`Voice`}
                 value={getVoiceName(settings.kittenVoice)}
-                description={t`8 lightweight AI voices`}
+                description={t`8 voices`}
                 onClick={() => setActiveSheet('kittenVoice')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Keeps generating ahead even while paused`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -498,21 +450,21 @@ export function SettingsPage() {
                 onClick={() => setActiveSheet('voice')}
               />
               <SettingsItem
-                label={t`Model Quality`}
+                label={t`Quality`}
                 value={getModelName(settings.modelConfig)}
-                description={t`WebGPU always uses fp32; quantized models are WASM-only`}
+                description={t`Used for CPU mode`}
                 onClick={() => setActiveSheet('modelConfig')}
               />
               <SettingsItem
-                label={t`Processing Device`}
+                label={t`Processor`}
                 value={getDeviceName(settings.processingDevice)}
-                description={t`WebGPU is fastest when supported`}
+                description={t`WebGPU is faster`}
                 onClick={() => setActiveSheet('processingDevice')}
               />
               <SettingsItem
-                label={t`Buffer Ahead`}
+                label={t`Preload Audio`}
                 value={getBufferAheadLabel()}
-                description={t`Keeps generating ahead even while paused`}
+                description={t`Generate upcoming audio`}
                 onClick={() => setActiveSheet('bufferAhead')}
               />
             </>
@@ -606,14 +558,14 @@ export function SettingsPage() {
               <SettingsItem
                 icon={<TrashIcon className="h-5 w-5 text-warning" />}
                 label={t`Clear All Audio`}
-                description={t`Remove all generated audio to free up space`}
+                description={t`Delete generated audio`}
                 onClick={handleClearAllAudio}
                 danger
               />
               <SettingsItem
                 icon={<TrashIcon className="h-5 w-5 text-error" />}
                 label={t`Clear All Data`}
-                description={t`Remove all books, audio, and settings`}
+                description={t`Delete books, audio, and settings`}
                 onClick={handleClearAllData}
                 danger
               />
@@ -628,7 +580,7 @@ export function SettingsPage() {
           <SettingsItem
             icon={<SmartphoneIcon className="h-5 w-5" />}
             label={t`Share Library`}
-            description={t`Send your books to another device`}
+            description={t`Send books to another device`}
             onClick={() => navigate('/app/share-library')}
           />
           <SettingsItem
@@ -649,21 +601,20 @@ export function SettingsPage() {
           />
           <SettingsItem label={t`Version`} value="1.0.0" />
           <SettingsItem 
-            label={t`TTS Engine`}
+            label={t`Active TTS`}
             value={
               settings.ttsEngine === 'browser' ? 'Web Speech API' :
               settings.ttsEngine === 'piper' ? 'Piper VITS' :
               settings.ttsEngine === 'supertonic' ? 'Supertonic 66M' :
-              settings.ttsEngine === 'voicebox' ? 'Voicebox + Qwen3-TTS — Leo' :
               settings.ttsEngine === 'pocket' ? 'Pocket TTS — Leo' :
               settings.ttsEngine === 'sherpa' ? 'Sherpa-ONNX' :
               settings.ttsEngine === 'kitten' ? 'KittenTTS Nano 15M' :
               'Kokoro.js 82M'
             } 
           />
-          <SettingsItem label={t`Debug Logs`} description={t`View/copy logs on mobile (including TTS worker)`} onClick={() => navigate('/app/debug-logs')} />
-          <SettingsItem label={t`Accessibility`} description={t`Keyboard shortcuts, screen reader support`} onClick={() => navigate('/app/accessibility')} />
-          <SettingsItem label={t`Help & How it works`} onClick={() => navigate('/app/help')} />
+          <SettingsItem label={t`Debug Logs`} description={t`View or copy logs`} onClick={() => navigate('/app/debug-logs')} />
+          <SettingsItem label={t`Accessibility`} description={t`Keyboard and screen reader`} onClick={() => navigate('/app/accessibility')} />
+          <SettingsItem label={t`Help`} onClick={() => navigate('/app/help')} />
           <SettingsItem label={t`Terms & Privacy`} onClick={() => navigate('/app/terms')} />
           <SettingsItem label={t`License`} value="MIT" />
         </SettingsGroup>
@@ -674,11 +625,6 @@ export function SettingsPage() {
         isOpen={activeSheet === 'pocketLeo'}
         onClose={() => setActiveSheet(null)}
         onInstalledChange={setPocketVoiceInstalled}
-      />
-
-      <VoiceboxRemoteSetupSheet
-        isOpen={activeSheet === 'voiceboxLeo'}
-        onClose={() => setActiveSheet(null)}
       />
 
       <SelectionSheet
@@ -697,7 +643,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'ttsEngine'}
         onClose={() => setActiveSheet(null)}
-        title={t`TTS Engine`}
+        title={t`Voice Engine`}
         options={getTTSEngines().map((e) => ({ id: e.id, label: e.name, description: e.description }))}
         value={settings.ttsEngine}
         onChange={async (v) => {
@@ -712,14 +658,6 @@ export function SettingsPage() {
             }
           }
           
-          if (engine === 'voicebox') {
-            const hasReference = await voiceboxRemoteService.hasLeoReference()
-            if (!hasReference || !voiceboxRemoteService.hasConfig()) {
-              setActiveSheet('voiceboxLeo')
-              return
-            }
-          }
-
           // IMPORTANT: Set the voice for the new engine FIRST (without triggering reload)
           // so that when reloadTTSSettings runs, it reads the correct voice.
           // This prevents errors like "Voice 'F1' not found" when switching from Supertonic to Kokoro.
@@ -742,17 +680,13 @@ export function SettingsPage() {
             // Unique cache identity for Leo. Pocket itself always uses the local Leo clone.
             await settingsRepository.set('voiceId', 'pocket:leo')
             setSettings((prev) => ({ ...prev, voiceId: 'pocket:leo' }))
-          } else if (engine === 'voicebox') {
-            await settingsRepository.set('voiceId', 'voicebox:leo')
-            setSettings((prev) => ({ ...prev, voiceId: 'voicebox:leo' }))
           }
 
-          // Custom Leo engines use distinct generated-audio cache identities. Reload once
-          // when switching to/from either one so PlaybackController cannot retain the old voice.
-          const switchingToOrFromCustomLeo =
-            engine === 'pocket' || engine === 'voicebox' ||
-            settings.ttsEngine === 'pocket' || settings.ttsEngine === 'voicebox'
-          if (switchingToOrFromCustomLeo) {
+          // PlaybackController currently resolves the outgoing engine's voice during a hot-swap.
+          // A one-time page reload when switching to/from Pocket avoids a transient wrong cache key
+          // without changing the stable playback controller used by the existing engines.
+          const switchingToOrFromPocket = engine === 'pocket' || settings.ttsEngine === 'pocket'
+          if (switchingToOrFromPocket) {
             await settingsRepository.set('ttsEngine', engine)
             setSettings((prev) => ({ ...prev, ttsEngine: engine }))
             setActiveSheet(null)
@@ -769,7 +703,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'voice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Select Voice`}
+        title={t`Voice`}
         options={settings.ttsEngine === 'browser' 
           ? browserVoices.map((v) => ({ id: v.id, label: v.name }))
           : KOKORO_VOICES.map((v) => ({ id: v.id, label: v.name }))
@@ -781,7 +715,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'piperModel'}
         onClose={() => setActiveSheet(null)}
-        title={t`Select Piper Voice`}
+        title={t`Piper Voice`}
         options={PIPER_VOICES.map((v: { id: string; name: string; description: string }) => ({ id: v.id, label: v.name, description: v.description }))}
         value={settings.piperModel}
         onChange={(v) => updateSetting('piperModel', v as typeof settings.piperModel)}
@@ -790,7 +724,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'supertonicVoice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Select Supertonic Voice`}
+        title={t`Supertonic Voice`}
         options={SUPERTONIC_VOICE_OPTIONS.map((v) => ({ id: v.id, label: v.name, description: v.description }))}
         value={settings.supertonicVoice}
         onChange={(v) => updateSetting('supertonicVoice', v as typeof settings.supertonicVoice)}
@@ -799,7 +733,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'supertonicDevice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Supertonic Processing Device`}
+        title={t`Supertonic Processor`}
         options={getSupertonicDevices().map((d) => ({ id: d.id, label: d.name, description: d.description }))}
         value={settings.supertonicDevice}
         onChange={(v) => updateSetting('supertonicDevice', v as typeof settings.supertonicDevice)}
@@ -808,7 +742,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'sherpaVoice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Select Sherpa Voice`}
+        title={t`Sherpa Voice`}
         options={SHERPA_VOICE_OPTIONS.map((v) => ({ id: v.id, label: v.name, description: v.description }))}
         value={settings.sherpaVoice}
         onChange={(v) => updateSetting('sherpaVoice', v as typeof settings.sherpaVoice)}
@@ -817,7 +751,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'kittenVoice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Select Kitten Voice`}
+        title={t`Kitten Voice`}
         options={KITTEN_VOICE_OPTIONS.map((v) => ({ id: v.id, label: v.name, description: v.description }))}
         value={settings.kittenVoice}
         onChange={(v) => updateSetting('kittenVoice', v as typeof settings.kittenVoice)}
@@ -826,7 +760,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'modelConfig'}
         onClose={() => setActiveSheet(null)}
-        title={t`Model Quality`}
+        title={t`Quality`}
         options={getModelConfigs().map((m) => ({ id: m.id, label: m.name, description: m.description }))}
         value={settings.modelConfig}
         onChange={(v) => updateSetting('modelConfig', v as typeof settings.modelConfig)}
@@ -835,7 +769,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'processingDevice'}
         onClose={() => setActiveSheet(null)}
-        title={t`Processing Device`}
+        title={t`Processor`}
         options={getProcessingDevices().map((d) => ({ id: d.id, label: d.name, description: d.description }))}
         value={settings.processingDevice}
         onChange={(v) => updateSetting('processingDevice', v as typeof settings.processingDevice)}
@@ -844,7 +778,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'speed'}
         onClose={() => setActiveSheet(null)}
-        title={t`Default Speed`}
+        title={t`Speed`}
         options={SPEEDS.map((s) => ({ id: String(s), label: `${s}×` }))}
         value={String(settings.defaultSpeed)}
         onChange={(v) => updateSetting('defaultSpeed', Number(v))}
@@ -853,7 +787,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'skipForward'}
         onClose={() => setActiveSheet(null)}
-        title={t`Skip Forward Interval`}
+        title={t`Skip Forward`}
         options={SKIP_INTERVALS.map((s) => ({ id: String(s), label: t`${s} seconds` }))}
         value={String(settings.skipForwardSeconds)}
         onChange={(v) => updateSetting('skipForwardSeconds', Number(v))}
@@ -862,7 +796,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'skipBack'}
         onClose={() => setActiveSheet(null)}
-        title={t`Skip Back Interval`}
+        title={t`Skip Back`}
         options={SKIP_INTERVALS.map((s) => ({ id: String(s), label: t`${s} seconds` }))}
         value={String(settings.skipBackSeconds)}
         onChange={(v) => updateSetting('skipBackSeconds', Number(v))}
@@ -871,7 +805,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'autoRewind'}
         onClose={() => setActiveSheet(null)}
-        title={t`Auto-rewind on Resume`}
+        title={t`Resume Rewind`}
         options={[0, 5, 10, 15, 30].map((s) => ({ id: String(s), label: s === 0 ? t`Disabled` : t`${s} seconds` }))}
         value={String(settings.autoRewindSeconds)}
         onChange={(v) => updateSetting('autoRewindSeconds', Number(v))}
@@ -880,7 +814,7 @@ export function SettingsPage() {
       <SelectionSheet
         isOpen={activeSheet === 'bufferAhead'}
         onClose={() => setActiveSheet(null)}
-        title={t`Buffer Ahead`}
+        title={t`Preload Audio`}
         options={getBufferAheadChoices().map((c) => ({ id: c.id, label: c.label, description: c.description }))}
         value={
           settings.bufferAheadMode === 'minutes'
@@ -940,10 +874,26 @@ function SettingsItem({
     >
       {icon && <span className={danger ? '' : 'text-accent'}>{icon}</span>}
       <div className="min-w-0 flex-1">
-        <p className={`font-medium ${danger ? 'text-error' : 'text-text-primary'}`}>{label}</p>
-        {description && <p className="mt-0.5 text-xs text-text-muted">{description}</p>}
+        <p
+          className={`truncate font-medium ${danger ? 'text-error' : 'text-text-primary'}`}
+          title={label}
+        >
+          {label}
+        </p>
+        {description && (
+          <p className="mt-0.5 truncate text-xs text-text-muted" title={description}>
+            {description}
+          </p>
+        )}
       </div>
-      {value && <span className="text-sm text-text-secondary">{value}</span>}
+      {value && (
+        <span
+          className="max-w-[45%] flex-shrink-0 truncate text-right text-sm text-text-secondary"
+          title={value}
+        >
+          {value}
+        </span>
+      )}
       {onClick && !danger && <ChevronRightIcon className="h-5 w-5 flex-shrink-0 text-text-muted" />}
     </Component>
   )
@@ -1011,10 +961,14 @@ function SelectionSheet({
               onClick={() => onChange(option.id)}
               className="flex w-full items-center gap-3 px-5 py-3 text-left active:bg-surface-2 md:hover:bg-surface-2"
             >
-              <div className="flex-1">
-                <p className="font-medium text-text-primary">{option.label}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-text-primary" title={option.label}>
+                  {option.label}
+                </p>
                 {option.description && (
-                  <p className="mt-0.5 text-xs text-text-muted">{option.description}</p>
+                  <p className="mt-0.5 truncate text-xs text-text-muted" title={option.description}>
+                    {option.description}
+                  </p>
                 )}
               </div>
               {value === option.id && (
