@@ -2,6 +2,7 @@
 import { createLogger } from '@/services/logging'
 import { settingsRepository } from '@/services/storage/settingsRepository'
 import { splitTextIntoChunks } from './textChunking'
+import { ensurePocketTailPause } from './pocketProsody'
 
 const log = createLogger('tts')
 const VENDOR_COMMIT = '7d7a27423b0845eb0425c81a8aa5ed3f3d973eef'
@@ -592,9 +593,14 @@ class PocketService {
       if (epoch !== this.cancelEpoch) throw new DOMException('Generation cancelled', 'AbortError')
       if (!chunks.length) throw new Error('Pocket TTS returned no audio')
       const rate = runtime.bundle?.sampleRate || SAMPLE_RATE
-      const samples = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+      // Pocket does not support pause markup in its text prompt. Keep the model,
+      // text, chunking, and generation path untouched; only fill in a very small
+      // missing quiet tail when a generated chunk ends too abruptly. Existing
+      // model-produced silence is measured first and preserved as-is.
+      const pacedChunks = ensurePocketTailPause(chunks, rate, text)
+      const samples = pacedChunks.reduce((sum, chunk) => sum + chunk.length, 0)
       const result: PocketGeneratedAudio = {
-        requestId, blob: chunksToWav(chunks, rate), duration: samples / rate, chunkIndex, text,
+        requestId, blob: chunksToWav(pacedChunks, rate), duration: samples / rate, chunkIndex, text,
       }
       log.debug('Pocket TTS generated audio', { requestId, rtfx: metrics.rtfx, genTime: metrics.genTime })
       this.onAudioCallback?.(result)
