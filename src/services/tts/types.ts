@@ -15,7 +15,7 @@
  * Available TTS engines.
  * Add new engines here - this is the ONLY place engine IDs should be defined.
  */
-export type TTSEngine = 'browser' | 'piper' | 'kokoro' | 'supertonic' | 'sherpa' | 'kitten' | 'pocket'
+export type TTSEngine = 'browser' | 'piper' | 'kokoro' | 'supertonic' | 'sherpa' | 'kitten' | 'pocket' | 'chatterbox'
 
 // ============================================================================
 // Engine Capabilities
@@ -28,7 +28,7 @@ export type TTSEngine = 'browser' | 'piper' | 'kokoro' | 'supertonic' | 'sherpa'
 export interface TTSEngineCapabilities {
   /**
    * Does this engine pre-generate audio blobs?
-   * - true: Generates WAV/audio blobs (Kokoro, Piper, Supertonic, Pocket)
+   * - true: Generates WAV/audio blobs (Kokoro, Piper, Supertonic, Pocket, Chatterbox)
    * - false: Streams directly via Web Speech API (Browser TTS)
    * 
    * Affects: Whether to use AudioBlobBackend vs BrowserTTSBackend,
