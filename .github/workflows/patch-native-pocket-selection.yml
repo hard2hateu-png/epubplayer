@@ -19,8 +19,8 @@ jobs:
           ref: experiment-pocket-native-clean
 
       - name: Gate Pocket activation on Leo installation
-        shell: python
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           path = Path('src/features/settings/SettingsPage.tsx')
@@ -44,7 +44,7 @@ jobs:
             window.location.reload()
             return
           }
-"""
+          """
 
           new = """          } else if (engine === 'pocket') {
             // Do not switch the reader into Pocket until Leo actually exists.
@@ -71,12 +71,13 @@ jobs:
             window.location.reload()
             return
           }
-"""
+          """
 
           if old not in text:
             raise SystemExit('Expected Pocket engine-selection block was not found; refusing to patch.')
 
           path.write_text(text.replace(old, new, 1))
+          PY
 
       - name: Commit patch
         run: |
