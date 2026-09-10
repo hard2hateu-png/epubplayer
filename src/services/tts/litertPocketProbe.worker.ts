@@ -73,14 +73,6 @@ function halfToFloat(value: number): number {
   return sign * 2 ** (exponent - 15) * (1 + fraction / 1024)
 }
 
-function readFloat16Array(buffer: ArrayBuffer): Float32Array {
-  if (buffer.byteLength % 2) throw new Error('Invalid fp16 binary length')
-  const view = new DataView(buffer)
-  const result = new Float32Array(buffer.byteLength / 2)
-  for (let i = 0; i < result.length; i++) result[i] = halfToFloat(view.getUint16(i * 2, true))
-  return result
-}
-
 function readFloat32Array(buffer: ArrayBuffer): Float32Array {
   if (buffer.byteLength % 4) throw new Error('Invalid fp32 binary length')
   const source = new Float32Array(buffer)
@@ -382,7 +374,7 @@ async function generateLatents(
   status('Generating Alba speech on your iPhone…')
   const started = performance.now()
   const latents: Float32Array[] = []
-  let current = bos.slice()
+  let current: Float32Array<ArrayBufferLike> = bos.slice()
   let eosAt: number | null = null
 
   for (let frame = 0; frame < MAX_GENERATED_FRAMES; frame++) {

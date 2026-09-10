@@ -33,7 +33,7 @@ function getTTSEngines() {
   return [
     { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
     { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
-    { id: 'pocket' as TTSEngine, name: t`Pocket TTS`, description: t`Custom on-device voice.` },
+    { id: 'pocket' as TTSEngine, name: t`Pocket TTS`, description: t`LiteRT mobile compatibility test. Does not change your current engine.` },
     { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
     { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
     { id: 'kitten' as TTSEngine, name: t`Kitten (Light)`, description: t`Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download.` },
@@ -608,6 +608,14 @@ export function SettingsPage() {
         options={getTTSEngines().map((e) => ({ id: e.id, label: e.name, description: e.description }))}
         value={settings.ttsEngine}
         onChange={async (v) => {
+          // LiteRT is a compatibility probe only on this branch. Opening it must
+          // never activate Pocket, reload the app, or disturb the current reader.
+          // String(v) deliberately avoids narrowing the TTSEngine variable below.
+          if (String(v) === 'pocket') {
+            setActiveSheet('pocketLeo')
+            return
+          }
+
           const engine = v as TTSEngine
           
           // IMPORTANT: Set the voice for the new engine FIRST (without triggering reload)
