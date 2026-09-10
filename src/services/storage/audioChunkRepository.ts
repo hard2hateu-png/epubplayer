@@ -1,5 +1,17 @@
 import { db, type AudioChunk, audioChunkId } from './db'
 
+// Keep in sync with TTSBufferManager's Pocket cache generation version. Playback
+// historically queried the plain model config first, while Pocket background
+// buffering stores the safe Leo audio under this versioned model key.
+const POCKET_AUDIO_CACHE_VERSION = 'pocket-leo-v4-12s'
+
+function modelConfigCandidates(voiceId: string, modelConfig: string): string[] {
+  if (voiceId === 'pocket:leo' && !modelConfig.includes(':pocket-leo-')) {
+    return [modelConfig, `${modelConfig}:${POCKET_AUDIO_CACHE_VERSION}`]
+  }
+  return [modelConfig]
+}
+
 // ============================================================================
 // Audio Chunk Repository
 // ============================================================================
@@ -45,6 +57,8 @@ export const audioChunkRepository = {
   /**
    * Get audio chunk with fallback to global text cache.
    * First tries position-specific lookup, then falls back to text-hash-only lookup.
+   * Pocket also checks its versioned background-buffer key so a ready chunk does
+   * not briefly appear to be a cache miss when playback reaches it.
    */
   async getWithFallback(
     bookId: string,
@@ -54,24 +68,26 @@ export const audioChunkRepository = {
     modelConfig: string,
     textHash: string
   ): Promise<{ chunk: AudioChunk | undefined; source: 'position' | 'textHash' | 'miss' }> {
-    // Try position-specific lookup first
-    const positionChunk = await this.get(bookId, sectionIndex, chunkIndex, voiceId, modelConfig, textHash)
-    if (positionChunk) {
-      return { chunk: positionChunk, source: 'position' }
+    const candidates = modelConfigCandidates(voiceId, modelConfig)
+
+    for (const candidate of candidates) {
+      const positionChunk = await this.get(bookId, sectionIndex, chunkIndex, voiceId, candidate, textHash)
+      if (positionChunk) {
+        return { chunk: positionChunk, source: 'position' }
+      }
     }
 
-    // Fall back to global text hash lookup
-    const textHashChunk = await this.getByTextHash(textHash, voiceId, modelConfig)
-    if (textHashChunk) {
-      return { chunk: textHashChunk, source: 'textHash' }
+    for (const candidate of candidates) {
+      const textHashChunk = await this.getByTextHash(textHash, voiceId, candidate)
+      if (textHashChunk) {
+        return { chunk: textHashChunk, source: 'textHash' }
+      }
     }
 
     return { chunk: undefined, source: 'miss' }
   },
 
-  /**
-   * Save an audio chunk
-   */
+  /** Save an audio chunk */
   async save(
     bookId: string,
     sectionIndex: number,
@@ -99,9 +115,7 @@ export const audioChunkRepository = {
     return id
   },
 
-  /**
-   * Check if a chunk exists in cache
-   */
+  /** Check if a chunk exists in cache */
   async exists(
     bookId: string,
     sectionIndex: number,
@@ -128,20 +142,26 @@ export const audioChunkRepository = {
     modelConfig: string,
     textHash: string
   ): Promise<boolean> {
-    const id = audioChunkId(bookId, sectionIndex, chunkIndex, voiceId, modelConfig, textHash)
-    const positionCount = await db.audioChunks.where('id').equals(id).count()
-    if (positionCount > 0) return true
+    const candidates = modelConfigCandidates(voiceId, modelConfig)
 
-    const globalCount = await db.audioChunks
-      .where('[textHash+voiceId+modelConfig]')
-      .equals([textHash, voiceId, modelConfig])
-      .count()
-    return globalCount > 0
+    for (const candidate of candidates) {
+      const id = audioChunkId(bookId, sectionIndex, chunkIndex, voiceId, candidate, textHash)
+      const positionCount = await db.audioChunks.where('id').equals(id).count()
+      if (positionCount > 0) return true
+    }
+
+    for (const candidate of candidates) {
+      const globalCount = await db.audioChunks
+        .where('[textHash+voiceId+modelConfig]')
+        .equals([textHash, voiceId, candidate])
+        .count()
+      if (globalCount > 0) return true
+    }
+
+    return false
   },
 
-  /**
-   * Get all chunks for a section (for sequential playback)
-   */
+  /** Get all chunks for a section (for sequential playback) */
   async getForSection(
     bookId: string,
     sectionIndex: number,
@@ -159,23 +179,17 @@ export const audioChunkRepository = {
       .sort((a, b) => a.chunkIndex - b.chunkIndex)
   },
 
-  /**
-   * Delete all chunks for a book
-   */
+  /** Delete all chunks for a book */
   async deleteForBook(bookId: string): Promise<number> {
     return await db.audioChunks.where('bookId').equals(bookId).delete()
   },
 
-  /**
-   * Delete chunks older than a date (for cache management)
-   */
+  /** Delete chunks older than a date (for cache management) */
   async deleteOlderThan(date: Date): Promise<number> {
     return await db.audioChunks.where('createdAt').below(date).delete()
   },
 
-  /**
-   * Get total size of cached audio for a book
-   */
+  /** Get total size of cached audio for a book */
   async getSizeForBook(bookId: string): Promise<number> {
     let total = 0
     // Cursor iteration avoids holding every cached audio Blob for the book in
@@ -186,9 +200,7 @@ export const audioChunkRepository = {
     return total
   },
 
-  /**
-   * Get total size of all cached audio
-   */
+  /** Get total size of all cached audio */
   async getTotalSize(): Promise<number> {
     let total = 0
     await db.audioChunks.each((chunk) => {
@@ -197,9 +209,7 @@ export const audioChunkRepository = {
     return total
   },
 
-  /**
-   * Get chunk count for a book
-   */
+  /** Get chunk count for a book */
   async countForBook(bookId: string): Promise<number> {
     return await db.audioChunks.where('bookId').equals(bookId).count()
   },
