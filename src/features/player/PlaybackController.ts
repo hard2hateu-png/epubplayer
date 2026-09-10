@@ -722,7 +722,7 @@ class PlaybackController {
     // Re-read settings from repository
     const settings = await settingsRepository.getAll()
     const newEngine = settings.ttsEngine as TTSEngine
-    const newVoiceId = this.getVoiceForEngine(settings)
+    const newVoiceId = this.getVoiceForEngine(settings, newEngine)
     const newModelConfig = settings.modelConfig
 
     const engineChanged = newEngine !== this.currentEngine
@@ -922,8 +922,8 @@ class PlaybackController {
     supertonicVoice: string
     sherpaVoice: string
     kittenVoice: string
-  }): string {
-    switch (this.currentEngine) {
+  }, engine: TTSEngine = this.currentEngine): string {
+    switch (engine) {
       case 'supertonic':
         return settings.supertonicVoice
       case 'sherpa':
