@@ -1,0 +1,19 @@
+# Mirrors ResembleAI/chatterbox-turbo-demo's current ZeroGPU-compatible stack.
+# The Space should be duplicated from ResembleAI/chatterbox-turbo-demo so its
+# vendored `chatterbox/` package is retained; this requirements file documents
+# and pins the compatible runtime rather than installing chatterbox-tts 0.1.7,
+# whose PyTorch pin is older than current ZeroGPU support.
+numpy>=1.24.0,<1.26.0
+librosa==0.11.0
+s3tokenizer
+torch==2.11.0
+torchaudio==2.11.0
+transformers==4.46.3
+diffusers==0.29.0
+resemble-perth==1.0.1
+conformer==0.3.2
+safetensors==0.5.3
+spacy-pkuseg
+pykakasi==2.3.0
+pyloudnorm
+omegaconf
