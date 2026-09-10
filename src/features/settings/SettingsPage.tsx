@@ -609,15 +609,6 @@ export function SettingsPage() {
         value={settings.ttsEngine}
         onChange={async (v) => {
           const engine = v as TTSEngine
-
-          if (engine === 'pocket') {
-            const installed = await pocketService.hasLeoVoiceSample()
-            setPocketVoiceInstalled(installed)
-            if (!installed) {
-              setActiveSheet('pocketLeo')
-              return
-            }
-          }
           
           // IMPORTANT: Set the voice for the new engine FIRST (without triggering reload)
           // so that when reloadTTSSettings runs, it reads the correct voice.
