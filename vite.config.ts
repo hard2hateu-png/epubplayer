@@ -102,6 +102,11 @@ export default defineConfig({
       },
     }),
   ],
+  // JAX-JS is code-split inside a dedicated module worker. Vite's default IIFE
+  // worker format cannot represent that graph, so only worker output is changed.
+  worker: {
+    format: 'es',
+  },
   resolve: {
     alias: {
       '@': '/src',
