@@ -1,0 +1,43 @@
+name: Build Pocket prosody static preview
+
+on:
+  push:
+    branches:
+      - preview-pocket-prosody-build
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: preview-pocket-prosody-build
+          fetch-depth: 0
+
+      - name: Build exact experiment
+        run: |
+          npm ci
+          npm test -- src/services/tts/pocketProsody.test.ts
+          npm run build
+
+      - name: Snapshot static output
+        run: |
+          rm -rf preview-dist
+          cp -R dist preview-dist
+          git add -f preview-dist
+          git diff --cached --check
+
+      - name: Commit static preview
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "Preview output unchanged"
+            exit 0
+          fi
+          git commit -m "Build Pocket prosody preview assets"
+          git push origin HEAD:preview-pocket-prosody-build
