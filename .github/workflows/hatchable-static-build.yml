@@ -1,0 +1,59 @@
+name: Build static app for Hatchable
+
+on:
+  push:
+    branches:
+      - hatchable-build
+
+permissions:
+  contents: write
+
+jobs:
+  build-static:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fixed reader
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build production app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Adapt browser module URLs for Hatchable
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          changed = []
+          for path in Path('dist').rglob('*'):
+              if path.suffix not in {'.js', '.mjs'} or not path.is_file():
+                  continue
+              text = path.read_text()
+              patched = text.replace('import.meta.url', 'globalThis.location.href')
+              if patched != text:
+                  path.write_text(patched)
+                  changed.append(str(path))
+          print('Patched import.meta.url in:', *changed, sep='\n- ')
+          PY
+
+      - name: Publish dist branch
+        run: |
+          rm -rf /tmp/hatchable-dist
+          mkdir -p /tmp/hatchable-dist
+          cp -R dist/. /tmp/hatchable-dist/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout --orphan hatchable-dist
+          git rm -rf .
+          cp -R /tmp/hatchable-dist/. .
+          git add -A
+          git commit -m "Build stable reader for Hatchable"
+          git push --force origin HEAD:hatchable-dist
