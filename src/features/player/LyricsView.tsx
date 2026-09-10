@@ -5,14 +5,15 @@
  * The text sent to TTS is never modified here — this component is display-only.
  *
  * Browser TTS can provide exact word-boundary events, so we keep word highlighting
- * there. Blob-based engines such as Supertonic/Kokoro do not expose word timings;
- * for those engines we estimate a short active phrase from audio time vs duration.
+ * there. Blob-based engines do not expose word timings; for those engines we
+ * estimate a short active phrase from audio time vs duration.
  */
 
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { playbackController } from './PlaybackController'
 import { BrowserTTSBackend, AudioBlobBackend } from './audioBackends'
 import { usePlayerStore } from './playerStore'
+import { ttsManager } from '@/services/tts'
 
 interface LyricsViewProps {
   chunkText: string
@@ -22,6 +23,12 @@ interface TextRange {
   text: string
   start: number
   end: number
+}
+
+interface HighlightOptions {
+  maxWords: number
+  minWordsBeforeNaturalBreak: number
+  maxExpandedWords: number
 }
 
 function splitIntoSentenceRanges(text: string): TextRange[] {
@@ -67,13 +74,17 @@ function splitIntoSentenceRanges(text: string): TextRange[] {
 // Generated audio has no exact word timings. Keep the visual highlight small and
 // stable by pre-splitting long sentences into fixed phrase spans. These ranges are
 // display-only; they never alter the chunk sent to the TTS engine.
-function splitIntoHighlightRanges(text: string): TextRange[] {
+function splitIntoHighlightRanges(
+  text: string,
+  options: HighlightOptions = {
+    maxWords: 10,
+    minWordsBeforeNaturalBreak: 6,
+    maxExpandedWords: 10,
+  },
+): TextRange[] {
   const sentences = splitIntoSentenceRanges(text)
   const ranges: TextRange[] = []
-  // Slightly longer phrases make the approximate generated-audio tracking feel
-  // steadier at faster playback speeds without returning to huge sentence blocks.
-  const maxWords = 10
-  const minWordsBeforeNaturalBreak = 6
+  const { maxWords, minWordsBeforeNaturalBreak, maxExpandedWords } = options
 
   for (const sentence of sentences) {
     const tokens: { text: string; start: number; end: number }[] = []
@@ -88,14 +99,27 @@ function splitIntoHighlightRanges(text: string): TextRange[] {
       })
     }
 
-    if (tokens.length <= maxWords) {
+    if (tokens.length <= maxExpandedWords) {
       ranges.push(sentence)
       continue
     }
 
     let tokenIndex = 0
     while (tokenIndex < tokens.length) {
+      const remainingWords = tokens.length - tokenIndex
       let endToken = Math.min(tokenIndex + maxWords, tokens.length)
+
+      // Pocket can absorb a tiny one-to-three-word tail into the current phrase.
+      // This keeps the highlight a little broader without creating a distracting
+      // final flash such as a single word or closing bit of dialogue.
+      const tailWords = tokens.length - endToken
+      if (
+        tailWords > 0 &&
+        tailWords <= 3 &&
+        remainingWords <= maxExpandedWords
+      ) {
+        endToken = tokens.length
+      }
 
       // Prefer a nearby clause boundary so highlights read like natural phrases.
       if (endToken < tokens.length) {
@@ -161,7 +185,16 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     return result
   }, [chunkText])
 
-  const highlightRanges = useMemo(() => splitIntoHighlightRanges(chunkText), [chunkText])
+  const isPocket = ttsManager.getEngine() === 'pocket'
+  const highlightRanges = useMemo(
+    () => splitIntoHighlightRanges(
+      chunkText,
+      isPocket
+        ? { maxWords: 12, minWordsBeforeNaturalBreak: 7, maxExpandedWords: 15 }
+        : { maxWords: 10, minWordsBeforeNaturalBreak: 6, maxExpandedWords: 10 },
+    ),
+    [chunkText, isPocket],
+  )
 
   // Exact word boundaries are available only for browser TTS. For generated
   // audio, poll playback time to estimate which fixed phrase is currently spoken.
