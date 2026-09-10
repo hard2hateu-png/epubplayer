@@ -238,8 +238,13 @@ class TTSManager {
       log.info('Initializing engine', { engine })
       this.onProgressCallback?.('Initializing TTS...', 0)
 
-      // Engines that don't require init are ready immediately
+      // Engines that don't require model preload are ready immediately.
+      // Chatterbox still needs its service callbacks wired here; the remote
+      // connection itself remains deferred until the first generation request.
       if (!this.getCurrentCapabilities().requiresInit) {
+        if (engine === 'chatterbox') {
+          this.wireUpService(chatterboxService, 'chatterbox')
+        }
         log.debug('No initialization needed', { engine })
         this.markReady()
         return

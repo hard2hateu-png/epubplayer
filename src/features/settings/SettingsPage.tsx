@@ -34,7 +34,7 @@ function getTTSEngines() {
     { id: 'browser' as TTSEngine, name: t`Browser (Instant)`, description: t`Uses your device's built-in voices. Fast and reliable.` },
     { id: 'supertonic' as TTSEngine, name: t`Supertonic (Recommended)`, description: t`AI voice with great quality and speed. Works on most devices. ~260MB download.` },
     { id: 'pocket' as TTSEngine, name: t`Pocket TTS`, description: t`Custom on-device voice.` },
-    { id: 'chatterbox' as TTSEngine, name: t`Chatterbox`, description: t`High-quality English voice cloning.` },
+    { id: 'chatterbox' as TTSEngine, name: t`Chatterbox`, description: t`English voice clone. Sends Leo reference online.` },
     { id: 'sherpa' as TTSEngine, name: t`Sherpa (Multi-Speaker)`, description: t`Neural TTS with 900+ voices. Proper phonemization. ~100MB download.` },
     { id: 'kokoro' as TTSEngine, name: t`Kokoro (Premium)`, description: t`Highest quality AI voice. Requires powerful GPU for smooth playback.` },
     { id: 'kitten' as TTSEngine, name: t`Kitten (Light)`, description: t`Lightweight AI voice. Fast on any device, no GPU needed. ~24MB download.` },
