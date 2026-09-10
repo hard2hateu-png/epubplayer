@@ -13,8 +13,7 @@ import {
 
 type Backend = 'webgpu' | 'wasm'
 type Mode = 'clone' | 'synthesis'
-type OwnedFloat32 = Float32Array<ArrayBuffer>
-type VoiceEmbedding = { data: OwnedFloat32; shape: number[] }
+type VoiceEmbedding = { data: Float32Array; shape: number[] }
 type WorkerRequest = {
   id: number
   type: 'init' | 'cloneVoice' | 'loadVoice' | 'generate' | 'cancel'
@@ -32,6 +31,11 @@ const TOKENIZER_URL =
   'https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/fbf8280/tokenizer.model'
 const SAMPLE_RATE = 24_000
 const FRAME_SAMPLES = 1_920
+
+// NOTE: This experiment built successfully but crashed iPhone Safari while
+// preparing the Leo clone. The clone path requires the full Pocket model plus
+// Mimi encoder to coexist in WebKit's page/worker memory budget. Keep this
+// branch for postmortem only; do not merge or use it as the active iPhone path.
 
 let model: PocketTTS | null = null
 let backend: Backend | null = null
@@ -55,12 +59,6 @@ function postError(id: number, error: unknown): void {
   })
 }
 
-function ownedFloat32(input: Float32Array): OwnedFloat32 {
-  const copy = new Float32Array(input.length)
-  copy.set(input)
-  return copy
-}
-
 function getModel(): PocketTTS {
   if (!model) throw new Error('JAX Pocket model is not loaded')
   return model
@@ -72,8 +70,6 @@ function weightDtype(): np.DType {
 
 function dropCloneOnlyWeights(): void {
   const current = getModel()
-  // Narration never needs Mimi's encoder. Releasing it after hydration keeps the
-  // long-lived audiobook worker smaller while preserving the decoder + FlowLM.
   tree.dispose([
     current.mimi.encoder,
     current.mimi.encoderTransformer,
@@ -125,8 +121,9 @@ async function initialize(mode: Mode): Promise<{ backend: Backend; sampleRate: n
   return { backend, sampleRate: SAMPLE_RATE }
 }
 
-function padAudio(audio: Float32Array): OwnedFloat32 {
+function padAudio(audio: Float32Array): Float32Array {
   const paddedLength = Math.max(FRAME_SAMPLES, Math.ceil(audio.length / FRAME_SAMPLES) * FRAME_SAMPLES)
+  if (paddedLength === audio.length) return audio.slice()
   const padded = new Float32Array(paddedLength)
   padded.set(audio)
   return padded
@@ -138,14 +135,12 @@ async function cloneVoice(audio: Float32Array): Promise<VoiceEmbedding> {
 
   postStatus('Encoding Leo locally with JAX-JS…', 92)
   const padded = padAudio(audio)
-  let waveform = np.array(padded, {
+  let waveform = np.array(Array.from(padded), {
     shape: [1, padded.length],
     dtype: np.float32,
   })
   if (weightDtype() !== np.float32) waveform = waveform.astype(weightDtype())
 
-  // runMimiEncode returns [512, T]. Pocket voice conditioning expects
-  // [T, 1024], so transpose and apply the official speaker projection.
   const encoded = runMimiEncode(tree.ref(current.mimi), waveform)
   const voiceFrames = encoded.transpose([1, 0])
   const projected = runLinear(
@@ -157,8 +152,8 @@ async function cloneVoice(audio: Float32Array): Promise<VoiceEmbedding> {
   const raw = (await fp32.data()) as Float32Array
   fp32.dispose()
 
-  voiceEmbedding = { data: ownedFloat32(raw), shape }
-  const copy = ownedFloat32(voiceEmbedding.data)
+  voiceEmbedding = { data: new Float32Array(raw), shape }
+  const copy = voiceEmbedding.data.slice()
   postStatus('Leo voice embedding ready', 100)
   return { data: copy, shape: [...shape] }
 }
@@ -169,7 +164,7 @@ function loadVoice(data: Float32Array, shape: number[]): void {
   }
   const expected = shape.reduce((product, value) => product * value, 1)
   if (expected !== data.length) throw new Error('Saved Leo JAX voice length is invalid')
-  voiceEmbedding = { data: ownedFloat32(data), shape: shape.map(Number) }
+  voiceEmbedding = { data: data.slice(), shape: shape.map(Number) }
 }
 
 function prepareTextPrompt(input: string): { text: string; framesAfterEos: number } {
@@ -193,7 +188,7 @@ function makeConditioning(text: string): { embeds: np.Array; framesAfterEos: num
   const tokens = tokenizer.encode(prepared.text)
   const tokenArray = np.array(tokens, { dtype: np.uint32 })
   const textEmbeds = current.flowLM.conditionerEmbed.ref.slice(tokenArray)
-  let voiceEmbeds = np.array(voiceEmbedding.data, {
+  let voiceEmbeds = np.array(Array.from(voiceEmbedding.data), {
     shape: voiceEmbedding.shape,
     dtype: np.float32,
   })
@@ -208,14 +203,14 @@ function makeConditioning(text: string): { embeds: np.Array; framesAfterEos: num
 async function generatePcm(
   text: string,
   requestEpoch: number,
-): Promise<{ pcm: OwnedFloat32; sampleRate: number; rtfx: number }> {
+): Promise<{ pcm: Float32Array; sampleRate: number; rtfx: number }> {
   const current = getModel()
   const { embeds, framesAfterEos } = makeConditioning(text)
   const modelRef = tree.ref(current)
   let lastLatent = modelRef.flowLM.bosEmb.ref.reshape([1, -1])
   let flowState = createFlowLMState(modelRef.flowLM)
   let mimiState = createMimiDecodeState(modelRef.mimi)
-  const frames: OwnedFloat32[] = []
+  const frames: Float32Array[] = []
   let eosStep: number | null = null
   let key = random.key(Math.floor(Math.random() * 0xffffffff))
   const started = performance.now()
@@ -259,7 +254,7 @@ async function generatePcm(
       const pcmArray = np.clip(audio, -1, 1).astype(np.float32)
       const frame = (await pcmArray.data()) as Float32Array
       pcmArray.dispose()
-      frames.push(ownedFloat32(frame))
+      frames.push(new Float32Array(frame))
     }
   } finally {
     lastLatent.dispose()
