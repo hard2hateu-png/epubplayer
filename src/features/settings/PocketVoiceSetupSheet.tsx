@@ -32,20 +32,26 @@ export function PocketVoiceSetupSheet({
     setError(null)
 
     Promise.all([
-      pocketService.hasLeoVoiceSample(),
+      pocketService.getServerStatus(),
       settingsRepository.get('ttsEngine'),
     ])
-      .then(([hasReference, engine]) => {
+      .then(([status, engine]) => {
         if (cancelled) return
-        setInstalled(hasReference)
+        setInstalled(status.reachable && status.voiceInstalled)
         setActive(engine === 'pocket')
-        onInstalledChange?.(hasReference)
+        onInstalledChange?.(status.reachable && status.voiceInstalled)
+        if (!status.configured) {
+          setError('Native Pocket server is not configured for this test build.')
+        } else if (!status.reachable) {
+          setError('Native Pocket server is unavailable. Leo is not being reported as installed while the server is unreachable.')
+        }
       })
       .catch(() => {
         if (cancelled) return
         setInstalled(false)
         setActive(false)
         onInstalledChange?.(false)
+        setError('Could not check the native Pocket server.')
       })
       .finally(() => {
         if (!cancelled) setChecking(false)
@@ -63,18 +69,16 @@ export function PocketVoiceSetupSheet({
     if (!hasReference) {
       setInstalled(false)
       onInstalledChange?.(false)
-      throw new Error('Install the Leo reference before using Pocket TTS.')
+      throw new Error('Prepare Leo on the native Pocket server before using Pocket TTS.')
     }
 
-    // Pocket has one custom voice. Keep its engine + cache identity in sync so
-    // Settings, playback, and generated-audio caching all agree that Leo is active.
     await settingsRepository.set('voiceId', 'pocket:leo')
     await settingsRepository.set('ttsEngine', 'pocket')
     setActive(true)
     ttsManager.destroy()
 
-    // The settings page already renders Pocket-specific controls from ttsEngine.
-    // Reload once so Supertonic/Kokoro controls disappear immediately and Voice = Leo.
+    // Keep the existing settings/player engine swap behavior unchanged for the
+    // native experiment. Only Pocket's synthesis location is changing.
     window.location.reload()
   }
 
@@ -93,20 +97,20 @@ export function PocketVoiceSetupSheet({
   const handleFile = async (file: File | null) => {
     if (!file) return
     setBusy(true)
-    setMessage(null)
+    setMessage('Uploading the reference and preparing Leo once…')
     setError(null)
 
     try {
       await pocketService.installLeoVoiceSample(file)
       setInstalled(true)
       onInstalledChange?.(true)
-      setMessage(
-        'Preparing Leo. First setup can take a while.'
-      )
+      setMessage('Leo is prepared. Checking native Pocket playback…')
       await pocketService.initialize()
       setMessage('Leo is ready.')
       await activateLeo()
     } catch (err) {
+      setInstalled(false)
+      onInstalledChange?.(false)
       setError(
         err instanceof Error
           ? err.message
@@ -135,12 +139,12 @@ export function PocketVoiceSetupSheet({
         return
       }
 
-      setMessage('Leo was removed from this device.')
+      setMessage('Leo was removed from the Pocket server.')
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : 'Could not remove the Leo voice reference.'
+          : 'Could not remove the Leo voice.'
       )
     } finally {
       setBusy(false)
@@ -175,7 +179,7 @@ export function PocketVoiceSetupSheet({
               Leo Voice
             </h3>
             <p className="mt-1 text-sm text-text-muted">
-              Pocket TTS on this device.
+              Native Pocket TTS for smoother iPhone playback.
             </p>
           </div>
           <button
@@ -191,7 +195,7 @@ export function PocketVoiceSetupSheet({
         <div className="space-y-4 px-5 py-5">
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="font-medium text-text-primary">Leo reference</span>
+              <span className="font-medium text-text-primary">Leo voice</span>
               <span
                 className={
                   installed
@@ -199,11 +203,11 @@ export function PocketVoiceSetupSheet({
                     : 'text-sm text-text-muted'
                 }
               >
-                {checking ? 'Checking…' : active ? 'Active' : installed ? 'Installed' : 'Not installed'}
+                {checking ? 'Checking…' : active && installed ? 'Active' : installed ? 'Ready' : 'Not installed'}
               </span>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              Uses your saved Leo reference on this device.
+              Leo is prepared once with Kyutai&apos;s native Pocket model, then the saved voice state is reused for narration.
             </p>
           </div>
 
@@ -218,7 +222,7 @@ export function PocketVoiceSetupSheet({
             </button>
           )}
 
-          {active && (
+          {active && installed && (
             <div className="rounded-xl bg-accent/10 px-4 py-3">
               <p className="text-sm font-medium text-text-primary">Leo is active</p>
               <p className="mt-1 text-xs leading-relaxed text-text-muted">
@@ -229,10 +233,10 @@ export function PocketVoiceSetupSheet({
 
           <div className="rounded-xl bg-surface-2 px-4 py-3">
             <p className="text-sm font-medium text-text-primary">
-              Saved locally
+              Optimized for audiobooking
             </p>
             <p className="mt-2 text-xs leading-relaxed text-text-muted">
-              After first setup, Leo starts faster.
+              The Pocket model stays warm on the private server. Your iPhone receives normal generated audio and keeps using the reader&apos;s existing buffer and audio cache.
             </p>
           </div>
 
@@ -248,7 +252,7 @@ export function PocketVoiceSetupSheet({
             </span>
             <input
               type="file"
-              accept="audio/*,.wav,.mp3,.m4a,.aac"
+              accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg"
               className="sr-only"
               disabled={busy}
               onChange={(event) => {
@@ -283,7 +287,7 @@ export function PocketVoiceSetupSheet({
           )}
 
           <p className="text-xs leading-relaxed text-text-muted">
-            Pocket downloads its model once and keeps it on this device.
+            Pocket TTS requires an internet connection in this native-server experiment. Your book remains in the reader; only the current narration text is sent for speech generation.
           </p>
         </div>
       </div>
