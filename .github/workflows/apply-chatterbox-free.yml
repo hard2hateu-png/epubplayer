@@ -1,0 +1,91 @@
+name: Apply and verify free Chatterbox integration
+
+on:
+  push:
+    branches:
+      - feat/chatterbox-turbo-clean
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install existing dependencies
+        run: npm ci
+
+      - name: Apply isolated patch
+        run: python tools/apply_chatterbox_free_patch.py
+
+      - name: Add Gradio browser client
+        run: npm install --save-exact @gradio/client@2.5.1
+
+      - name: Lint changed reader files
+        run: |
+          npx eslint \
+            src/services/tts/chatterboxService.ts \
+            src/services/tts/types.ts \
+            src/services/tts/index.ts \
+            src/services/tts/ttsManager.ts \
+            src/services/tts/pocketService.ts \
+            src/services/storage/settingsRepository.ts \
+            src/features/settings/SettingsPage.tsx \
+            src/features/settings/PocketVoiceSetupSheet.tsx \
+            src/features/player/TTSBufferManager.ts
+
+      - name: Build reader
+        run: npm run build
+
+      - name: Validate backend syntax
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          ast.parse(Path('infra/chatterbox-hf-space/app.py').read_text())
+          print('Backend Python syntax OK')
+          PY
+
+      - name: Remove temporary patch machinery
+        run: rm -f tools/apply_chatterbox_free_patch.py .github/workflows/apply-chatterbox-free.yml
+
+      - name: Stage and verify privacy + Pocket behavior
+        run: |
+          git add -A
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          settings = Path('src/features/settings/SettingsPage.tsx').read_text()
+          start = settings.index("title={t`TTS Engine`}")
+          end = settings.index("title={t`Select Voice`}", start)
+          picker = settings[start:end]
+          if "setActiveSheet('pocketLeo')" in picker:
+              raise SystemExit('Pocket engine picker still opens Leo setup')
+
+          tracked = subprocess.check_output(['git', 'ls-files'], text=True).splitlines()
+          forbidden_exts = ('.wav', '.mp3', '.m4a', '.aac', '.onnx')
+          suspicious = [p for p in tracked if 'leo' in p.lower() and p.lower().endswith(forbidden_exts)]
+          suspicious += [p for p in tracked if 'leo' in p.lower() and ('embedding' in p.lower() or 'reference' in p.lower())]
+          if suspicious:
+              raise SystemExit('Private Leo material appears tracked: ' + ', '.join(sorted(set(suspicious))))
+          print('Privacy and Pocket-selection guards OK')
+          PY
+
+      - name: Commit verified implementation
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Add isolated free Chatterbox backend and fix Pocket selection"
+          git push origin HEAD:feat/chatterbox-turbo-clean
