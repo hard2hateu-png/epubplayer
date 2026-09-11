@@ -119,7 +119,30 @@ function exportCustomVoiceEmbedding(ref) {
             post({ id, type: "result", result: { ref } });
         } else if (type === "loadBuiltinVoice") {`
   if (!result.includes(dispatchOriginal)) throw new Error('Pocket worker dispatch patch no longer matches')
-  return result.replace(dispatchOriginal, dispatchPatched)
+  result = result.replace(dispatchOriginal, dispatchPatched)
+
+  // Hugging Face can transiently return 429 on a fresh origin while Pocket's
+  // model bundle is being populated. The vendored worker currently fails on
+  // the first non-2xx response, so add bounded 429-only retry/backoff without
+  // changing model URLs, model weights, synthesis, or playback behavior.
+  const fetchOriginal = '    const res = await fetch(url);\n    if (!res.ok) throw new Error(`Failed to fetch ${label}: ${res.status}`);'
+  const fetchPatched = `    let res = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+        res = await fetch(url);
+        if (res.ok) break;
+        if (res.status !== 429 || attempt === 4) {
+            throw new Error(\`Failed to fetch \${label}: \${res.status}\`);
+        }
+        const retryAfter = Number(res.headers.get("retry-after"));
+        const delayMs = Number.isFinite(retryAfter) && retryAfter > 0
+            ? Math.min(retryAfter * 1000, 60000)
+            : 1500 * Math.pow(2, attempt);
+        try { await res.body?.cancel(); } catch { /* best effort */ }
+        post({ type: "status", status: \`Rate limited downloading \${label}; retrying…\` });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }`
+  if (!result.includes(fetchOriginal)) throw new Error('Pocket worker fetch patch no longer matches')
+  return result.replace(fetchOriginal, fetchPatched)
 }
 
 class PocketWorkerRuntime {
