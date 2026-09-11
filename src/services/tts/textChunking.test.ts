@@ -56,4 +56,35 @@ describe('splitTextIntoChunks', () => {
     expect(lastChunkWords).toBeGreaterThan(4)
     expect(chunks.join(' ').replace(/\s+/g, ' ').trim()).toBe(text)
   })
+
+  it('handles closing quotes as Pocket narration boundaries without detaching dialogue tags', () => {
+    const action = `He turned toward the hallway, ${'wondering whether she really meant it, '.repeat(3)}then looked back at her.`
+    const text = `"Are you coming?" ${action}`
+    const chunks = splitTextIntoChunks(text, 150, { dialogueAwareSentenceSplits: true })
+
+    expect(chunks[0]).toBe('"Are you coming?"')
+    expect(chunks.slice(1).join(' ')).toBe(action)
+  })
+
+  it('keeps a closing-quote question attached to its dialogue attribution in Pocket mode', () => {
+    const tail = `Then he looked toward the hallway, ${'trying to decide what to say next, '.repeat(3)}before answering.`
+    const dialogue = '"Are you coming?" she asked.'
+    const chunks = splitTextIntoChunks(`${dialogue} ${tail}`, 150, {
+      dialogueAwareSentenceSplits: true,
+    })
+
+    expect(chunks[0]).toBe(dialogue)
+    expect(chunks.some((chunk) => /^she asked\b/i.test(chunk))).toBe(false)
+  })
+
+  it('leaves default sentence behavior unchanged for non-Pocket callers', () => {
+    const action = `He turned toward the hallway, ${'wondering whether she really meant it, '.repeat(3)}then looked back at her.`
+    const text = `"Are you coming?" ${action}`
+    const defaultChunks = splitTextIntoChunks(text, 150)
+    const pocketChunks = splitTextIntoChunks(text, 150, { dialogueAwareSentenceSplits: true })
+
+    expect(defaultChunks).not.toEqual(pocketChunks)
+    expect(pocketChunks[0]).toBe('"Are you coming?"')
+  })
+
 })
