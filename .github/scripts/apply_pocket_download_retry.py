@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot branch patch. This file is deleted after the tested change lands.
 path = Path('src/services/tts/pocketService.ts')
 text = path.read_text()
 
