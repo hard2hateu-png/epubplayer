@@ -1,202 +1,39 @@
-# EPUB Player
+# Pocket TTS for iPhone
 
-**Turn your EPUBs into audiobooks with neural text-to-speech — entirely in your browser.**
+A standalone iPhone web app based on the uploaded Pocket TTS 3 project. Paste text or choose a PDF, EPUB, or TXT file, select a voice, and generate speech. Record or upload a sample to create a cloned voice. Finished audio can be replayed or downloaded as M4A.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Live Demo](https://img.shields.io/badge/demo-epubplayer.com-purple)](https://epubplayer.com)
+## Hosting
 
----
+The Python speech engine runs on Railway. A private Sites gateway serves the app and forwards requests to the engine. The server requires the shared `APP_ACCESS_KEY`; the key is never included in browser code. The Sites runtime uses `POCKET_SERVER_URL` and the secret `POCKET_SERVER_KEY`.
 
-## What is this?
+`HF_TOKEN` can be supplied as a server secret to enable Kyutai's gated voice-cloning model, provided the associated account has accepted its terms. The Setup screen also supports a user-entered read token. Never put tokens into Git or an image. Built-in voices can use the ungated model.
 
-EPUB Player is a free, open-source Progressive Web App (PWA) that transforms your EPUB ebooks into audiobooks using AI-powered text-to-speech. Everything runs locally in your browser — your books never leave your device.
+The server is CPU-only, uses two inference threads, and runs one model worker. Model loading occurs after startup so the app can display progress. Railway health checks use `/health`. Generated files are temporary: the newest six completed files are retained, and a restart or redeploy may clear them. Download audio you want to keep. A server sleeping between uses needs time to wake and load the model again.
 
-**No accounts. No uploads. No subscriptions. Just your books, as audio.**
+## iPhone
 
-<p align="center">
-  <img src="public/screenshots/library.png" alt="Library view" width="200" />
-  <img src="public/screenshots/now-playing.png" alt="Now Playing" width="200" />
-  <img src="public/screenshots/settings.png" alt="Settings" width="200" />
-</p>
+Open the private link in Safari and sign in with the owning ChatGPT account if requested. Choose Share → Add to Home Screen. Text extraction occurs in the browser; text to synthesize and voice samples are sent to the speech server. Cloned voice states and previews are stored in this browser's IndexedDB. Clearing site data removes them. Install the Home Screen app before creating voices if that is where you intend to use them.
 
-### Philosophy
+Keep the app open while streaming. A screen wake lock is requested where supported. Once generation finishes, playback switches to a native audio element with seeking, speed controls, and Media Session integration. Background behavior during generation depends on iOS and is not guaranteed. Audio generation requires an internet connection.
 
-| Principle | What it means |
-|-----------|---------------|
-| **Local-first** | Your books, audio, and settings live in your browser's storage. Nothing is ever sent to a server. |
-| **Mobile-first** | Designed for phones first, with responsive layouts for tablets and desktops. |
-| **Offline-capable** | After the first load, the app works without internet. Listen anywhere. |
-| **Privacy by default** | No accounts, no tracking, no analytics. Your reading habits are yours alone. |
+Samples must contain at least three seconds of speech; 5–30 seconds is recommended. Longer samples use the first 30 seconds. Uploads are limited to 40 MB and narration to 500,000 characters per request.
 
-### Features
+## Local development
 
-- 📚 **Import any EPUB** — drag and drop or select files
-- 🎙️ **Neural TTS** — natural-sounding voices via Kokoro (WebGPU/WASM)
-- 🔒 **100% local** — your books never leave your device
-- 📱 **Works everywhere** — phone, tablet, desktop
-- ✈️ **Offline support** — listen anywhere after first load
-- ⏱️ **Full audiobook controls** — bookmarks, speed control, sleep timer
-- 🎨 **Lock screen controls** — Media Session API integration
-- 💾 **Audio caching** — generated audio is saved for instant replay
+Requires Python 3.12 and a CPU with enough memory for PyTorch and the model.
 
-### TTS Engines
-
-| Engine | Quality | Speed | Requirements |
-|--------|---------|-------|--------------|
-| **Kokoro** | ★★★★★ | Moderate | WebGPU (best) or WASM fallback |
-| **Supertonic** | ★★★★☆ | Fast | WebGPU |
-| **Piper** | ★★★☆☆ | Fast | WASM |
-| **Browser TTS** | ★★☆☆☆ | Instant | Built-in (varies by device) |
-
----
-
-## Try It
-
-**[→ Try EPUB Player](https://epubplayer.com)** — it's live and free!
-
-Or run it locally:
-
-```bash
-# Clone the repository
-git clone https://github.com/grworg/epubplayer.git
-cd epubplayer
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+```sh
+sh bootstrap.sh
+sh start.sh
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Open `http://localhost:8321`. Microphone recording on another device requires HTTPS. Runtime data lives in `data/`, or the directory selected by `POCKET_DATA_DIR`.
 
----
+## Layout
 
-## Development
+- `app/`: iPhone interface, streaming player, file parsers, manifest and asset-only service worker.
+- `server/`: FastAPI speech engine, cloning, streaming, M4A encoding and temporary job storage.
+- `site/`: private Cloudflare Worker gateway and its build script.
+- `Dockerfile` and `railway.json`: CPU hosting configuration.
 
-### Prerequisites
-
-- Node.js 18+
-- npm 9+
-
-### Commands
-
-```bash
-npm run dev          # Start dev server
-npm run dev:host     # Start dev server accessible on LAN (for phone testing)
-npm run build        # Production build
-npm run preview      # Preview production build
-npm run typecheck    # TypeScript check
-npm run lint         # ESLint
-npm run format       # Prettier
-npm run test         # Run unit tests
-npm run test:e2e     # Run Playwright e2e tests
-
-# SEO
-SITE_URL=https://epubplayer.com npm run seo:sitemap  # Generate sitemap.xml
-```
-
-### Testing on Mobile
-
-For the best mobile debugging experience with WebGPU:
-
-1. Connect your phone via USB
-2. Enable USB debugging on the phone
-3. Open `chrome://inspect/#devices` on desktop Chrome
-4. Enable port forwarding: `localhost:5173` → `127.0.0.1:5173`
-5. Open `http://localhost:5173` on your phone
-
-This keeps the origin as `localhost`, which is required for WebGPU to work.
-
----
-
-## Architecture
-
-EPUB Player is built with:
-
-- **React 19** + TypeScript
-- **Vite** (with PWA plugin)
-- **Tailwind CSS v4**
-- **Zustand** (state management)
-- **Dexie** (IndexedDB wrapper)
-- **Web Workers** (TTS generation off main thread)
-
-### Project Structure
-
-```
-src/
-├── app/              # App shell, routing
-├── features/         # Feature modules
-│   ├── library/      # Book library & import
-│   ├── player/       # Playback, buffering, audio backends
-│   ├── settings/     # User preferences
-│   └── ...
-├── services/
-│   ├── storage/      # IndexedDB repositories
-│   ├── tts/          # TTS engines, workers
-│   └── epub/         # EPUB parsing
-└── ui/               # Shared components, icons
-```
-
-For detailed architecture documentation, see [docs/architecture.md](docs/architecture.md).
-
-For the reasoning behind design decisions, see the [Architecture Decision Records](docs/decisions/).
-
----
-
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
-
-### Quick Start for Contributors
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-thing`
-3. Make your changes
-4. Run checks: `npm run typecheck && npm run lint`
-5. Commit with a clear message
-6. Push and open a Pull Request
-
----
-
-## Privacy
-
-EPUB Player is designed with privacy as a core principle:
-
-- **No accounts** — nothing to sign up for
-- **No server** — the app is purely client-side
-- **No uploads** — your books stay on your device
-- **No analytics** — we don't track you
-- **No ads** — ever
-
-Your data is stored in your browser's IndexedDB and never transmitted anywhere.
-
----
-
-## Support
-
-EPUB Player is free and always will be. If you find it useful and want to support development:
-
-☕ **[Buy Me a Coffee](https://buymeacoffee.com/grworg)**
-
-No pressure — using and sharing the app is support enough!
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE) for details.
-
----
-
-## Acknowledgments
-
-- [Kokoro TTS](https://github.com/hexgrad/kokoro) — Neural text-to-speech model
-- [epub.js](https://github.com/futurepress/epub.js) — EPUB parsing
-- [Dexie.js](https://dexie.org/) — IndexedDB wrapper
-
----
-
-<p align="center">
-  Made with ❤️ for audiobook lovers everywhere
-</p>
+The original project's vendored PDF.js and JSZip files and app icons are retained. PDF scripting evaluation is disabled. Playback fixes include connecting audio sources, recovering from stream underruns, retaining a short rewind window, accurate media time, working cancellation, and native playback of the completed M4A.

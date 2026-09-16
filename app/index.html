@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pocket TTS">
+<meta name="theme-color" content="#14121b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-512.png">
+<link rel="stylesheet" href="style.css">
+<meta name="description" content="Generate speech and clone voices from your iPhone. Read text, PDF, EPUB and TXT, and save the audio.">
+<title>Pocket TTS</title>
+</head>
+<body>
+
+<!-- ============ SETUP (gated model not yet connected) ============ -->
+<div id="setup" class="screen" hidden>
+  <div class="setup-inner">
+    <img src="icons/icon-512.png" class="setup-icon" alt="">
+    <h1>Pocket TTS <span>3</span></h1>
+    <p class="setup-sub">English · voice cloning · runs on this server</p>
+
+    <div class="card setup-card">
+      <p id="setupMsg" class="setup-msg">
+        Voice cloning uses Kyutai's <b>Pocket TTS 3</b> model, which is freely available on
+        Hugging Face behind a terms-acceptance gate. One-time setup:
+      </p>
+      <ol class="steps">
+        <li><a href="https://huggingface.co/join" target="_blank" rel="noopener">Create a free Hugging Face account</a> (if you don't have one)</li>
+        <li>Open <a href="https://huggingface.co/kyutai/pocket-tts" target="_blank" rel="noopener">the model page</a> and accept the terms</li>
+        <li>Create a token at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Settings → Access tokens</a> (a <i>read</i> token is enough) and paste it below</li>
+      </ol>
+      <label class="lbl" for="token">Hugging Face token</label>
+      <input id="token" type="password" autocapitalize="off" autocomplete="off" spellcheck="false"
+             placeholder="hf_…">
+      <button id="setupBtn" class="btn primary big">Connect model</button>
+      <div id="setupStatus" class="status-line" role="status" aria-live="polite"></div>
+      <p class="fineprint">
+        A token you enter here is saved in this browser and sent securely to the speech server to download the model. It is not saved by the app on the server. Until then, built-in voices are available below.
+      </p>
+    </div>
+
+    <button id="setupSkip" class="btn ghost">Continue with built-in voices (no cloning)</button>
+  </div>
+</div>
+
+<!-- ============ MAIN ============ -->
+<div id="main" class="screen" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <img src="icons/icon-180.png" alt="">
+      <div class="brand-text">
+        <h1>Pocket TTS <span>3</span></h1>
+        <div class="sub" id="statusSub">connecting…</div>
+      </div>
+    </div>
+    <button id="setupBtnTop" class="pill-btn" hidden title="Model setup">Setup</button>
+  </header>
+
+  <main class="content">
+
+    <!-- ================= READ ================= -->
+    <section id="viewRead" class="view">
+      <div class="card">
+        <div class="seg-toggle">
+          <button id="modeText" class="seg active">Type text</button>
+          <button id="modeFile" class="seg">File</button>
+        </div>
+        <textarea id="textInput" aria-label="Text to read" placeholder="Type or paste text here…" rows="7"></textarea>
+        <div id="fileRow" hidden>
+          <button id="filePick" class="btn ghost wide">
+            <span class="file-ico">📄</span>
+            <span id="filePickLabel">Choose a PDF, EPUB or TXT file</span>
+          </button>
+          <input id="fileInput" type="file" accept=".txt,.epub,.pdf,text/plain,application/epub+zip,application/pdf" hidden>
+        </div>
+        <div id="docCard" class="doc-card" hidden>
+          <div class="doc-info">
+            <div class="doc-title" id="docTitle"></div>
+            <div class="doc-meta" id="docMeta"></div>
+          </div>
+          <button id="docClear" class="icon-btn" title="Remove document">✕</button>
+        </div>
+      </div>
+
+      <div class="section-title">Voice</div>
+      <div id="voiceChips" class="chips"></div>
+
+      <p class="fineprint">In Safari: Share → Add to Home Screen. Keep the app open while audio generates.</p>
+      <div id="genArea">
+        <button id="generateBtn" disabled class="btn primary big full">Generate audio</button>
+      </div>
+
+      <!-- progress -->
+      <div id="progressCard" class="card" hidden>
+        <div class="row between">
+          <div class="gen-title" id="genTitle">Generating…</div>
+          <button id="cancelBtn" class="icon-btn" title="Stop">✕</button>
+        </div>
+        <div class="bar"><div id="genBar" class="bar-fill"></div></div>
+        <div class="row between small">
+          <span id="genEta">–</span>
+          <span id="genPct">0%</span>
+        </div>
+      </div>
+
+      <!-- player -->
+      <div id="playerCard" class="card player" hidden>
+        <div class="player-head">
+          <div>
+            <div class="doc-title" id="playerTitle">Narration</div>
+            <div class="doc-meta" id="playerVoice">voice</div>
+          </div>
+          <button id="downloadBtn" class="dl-btn" hidden>⬇︎ Save</button>
+        </div>
+        <div class="times row between small">
+          <span id="tCur">0:00</span>
+          <span id="tTot">streaming…</span>
+        </div>
+        <div class="bar"><div id="playBar" class="bar-fill"></div></div>
+        <div class="transport">
+          <button id="backBtn" class="t-btn" title="Back 15s">⟲ 15</button>
+          <button id="playBtn" class="t-btn play">▶︎</button>
+          <button id="fwdBtn" class="t-btn" title="Forward 15s">15 ⟳</button>
+          <button id="speedBtn" class="t-btn speed">1×</button>
+        </div>
+        <div class="row between small player-foot">
+          <span id="playerNote"></span>
+          <button id="stopBtn" class="link-btn">Stop &amp; close</button>
+        </div>
+      </div>
+
+      <!-- recent jobs -->
+      <div id="recentCard" class="card" hidden>
+        <div class="section-title plain">Recent audio</div>
+        <div id="recentList"></div>
+      </div>
+    </section>
+
+    <!-- ================= VOICES ================= -->
+    <section id="viewVoices" class="view" hidden>
+      <div class="card">
+        <h2 class="card-h">New cloned voice</h2>
+        <p class="hint">Read 5–30 seconds of clear, steady speech. The model captures timbre, accent and rhythm using the speech server. Samples longer than 30 seconds use the first 30 seconds.</p>
+        <div class="row center gap">
+          <button id="recBtn" class="btn primary">🎙 Record my voice</button>
+          <button id="uploadBtn" class="btn ghost">Upload audio</button>
+          <input id="voiceFileInput" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden>
+        </div>
+
+        <div id="recUI" class="rec-ui" hidden>
+          <div class="level"><div id="levelBar"></div></div>
+          <div class="row center gap">
+            <span id="recTime" class="mono">0:00</span>
+            <button id="stopRecBtn" class="btn danger">Stop recording</button>
+          </div>
+        </div>
+
+        <div id="sampleUI" hidden>
+          <label class="lbl" for="voiceName">Voice name</label>
+          <input id="voiceName" type="text" maxlength="40" value="My voice">
+          <div id="sampleMeta" class="hint"></div>
+          <button id="createBtn" class="btn primary big full">Create voice</button>
+          <div id="cloneStatus" class="status-line" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="card" id="previewCard" hidden>
+        <h2 class="card-h">How it sounds</h2>
+        <audio id="previewAudio" controls playsinline></audio>
+        <p class="hint">This sentence was just spoken with your cloned voice.</p>
+        <div class="row center gap">
+          <button id="saveVoiceBtn" class="btn primary big">Save this voice</button>
+          <button id="discardVoiceBtn" class="btn ghost">Discard</button>
+        </div>
+      </div>
+
+      <div class="section-title">My voices</div>
+      <div id="voiceList"></div>
+      <p class="fineprint center">Cloned voices are stored only in this browser (IndexedDB). Clearing browser data removes them.</p>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button id="tabRead" class="tab active">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 5a2 2 0 0 1 2-2h6v18H6a2 2 0 0 1-2-2V5zm8-2h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6V3z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+      <span>Read</span>
+    </button>
+    <button id="tabVoices" class="tab">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 1 1-8 0V7a4 4 0 0 1 4-4zM5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>Voice</span>
+    </button>
+  </nav>
+</div>
+
+<audio id="finishedAudio" playsinline preload="metadata" hidden></audio>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="libs/pdf.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

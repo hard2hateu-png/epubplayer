@@ -1,0 +1,7 @@
+.git
+.venv
+data
+dist
+tests
+upload
+*.zip

@@ -1,0 +1,14 @@
+{
+  "name": "Pocket TTS 3 — English Voice Cloning",
+  "short_name": "Pocket TTS",
+  "description": "Read any text, PDF, EPUB or TXT aloud in your own cloned voice. Pocket TTS 3 (English).",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0a10",
+  "theme_color": "#14121b",
+  "icons": [
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
