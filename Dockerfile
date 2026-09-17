@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PORT=8000 POCKET_THREADS=2 HF_HOME=/srv/data/huggingface
 WORKDIR /srv
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
@@ -16,8 +17,8 @@ RUN sed -i 's/TTSModel.load_model(config=str(LOCAL_CONFIG))/TTSModel.load_model(
 # Voice-prompt encoding has a large transient memory spike. Keep a 15-second conditioning
 # window on the 1 GB Railway service; this stays within Pocket TTS's recommended range.
 RUN sed -i 's/SR \* 30/SR * 15/g' server/server.py
-# Keep live Web Audio at natural pitch. Defer the selected >1x speed until the finished
-# HTMLMediaElement takes over, where Safari can preserve pitch correctly.
+# Keep live PCM at 1x. Finished playback speed is generated server-side with FFmpeg atempo,
+# so iPhone Safari never changes playbackRate and cannot raise the voice pitch.
 RUN python build_patch_speed.py && rm build_patch_speed.py
 RUN mkdir -p /srv/data/models /srv/data/out
 CMD ["sh", "-c", "exec uvicorn server.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
