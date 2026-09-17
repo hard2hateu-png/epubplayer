@@ -9,5 +9,8 @@ COPY server ./server
 # Hugging Face's authenticated identity endpoint is /api/whoami-v2.
 # Patch the standalone setup validator at image build time without touching TTS behavior.
 RUN sed -i 's#https://huggingface.co/api/whoami#https://huggingface.co/api/whoami-v2#g' server/server.py
+# Railway currently caps this service at ~1 GB RAM. Pocket TTS supports dynamic int8
+# quantization for CPU inference; use it for both built-in and cloning-capable model loads.
+RUN sed -i 's/TTSModel.load_model(config=str(LOCAL_CONFIG))/TTSModel.load_model(config=str(LOCAL_CONFIG), quantize=True)/g; s/TTSModel.load_model(language="english")/TTSModel.load_model(language="english", quantize=True)/g' server/server.py
 RUN mkdir -p /srv/data/models /srv/data/out
 CMD ["sh", "-c", "exec uvicorn server.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
