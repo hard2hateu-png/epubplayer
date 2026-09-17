@@ -12,5 +12,8 @@ RUN sed -i 's#https://huggingface.co/api/whoami#https://huggingface.co/api/whoam
 # Railway currently caps this service at ~1 GB RAM. Pocket TTS supports dynamic int8
 # quantization for CPU inference; use it for both built-in and cloning-capable model loads.
 RUN sed -i 's/TTSModel.load_model(config=str(LOCAL_CONFIG))/TTSModel.load_model(config=str(LOCAL_CONFIG), quantize=True)/g; s/TTSModel.load_model(language="english")/TTSModel.load_model(language="english", quantize=True)/g' server/server.py
+# Voice-prompt encoding has a large transient memory spike. Keep a 15-second conditioning
+# window on the 1 GB Railway service; this stays within Pocket TTS's recommended range.
+RUN sed -i 's/SR \* 30/SR * 15/g' server/server.py
 RUN mkdir -p /srv/data/models /srv/data/out
 CMD ["sh", "-c", "exec uvicorn server.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
