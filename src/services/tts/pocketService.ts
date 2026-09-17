@@ -502,7 +502,9 @@ class PocketService {
     let candidate: PocketWorkerRuntime | null = null
     try {
       const maxChunkChars = await settingsRepository.get('maxChunkChars')
-      const deviceMaxChunkChars = isIOSDevice() ? 150 : MAX_CHUNK_CHARS
+      // Slightly longer Pocket phrases on iPhone reduce audible chunk boundaries
+      // without using the full desktop-sized chunks that are harder on WebKit memory.
+      const deviceMaxChunkChars = isIOSDevice() ? 180 : MAX_CHUNK_CHARS
       this.config = { maxChunkChars: Math.min(deviceMaxChunkChars, Math.max(120, maxChunkChars)) }
       this.onProgressCallback?.('Loading Pocket TTS...', 0)
 
