@@ -8,6 +8,7 @@ RUN pip install -r requirements.txt
 COPY app ./app
 COPY server ./server
 COPY build_patch_speed.py ./build_patch_speed.py
+COPY build_patch_pending_speed.py ./build_patch_pending_speed.py
 # Hugging Face's authenticated identity endpoint is /api/whoami-v2.
 # Patch the standalone setup validator at image build time without touching TTS behavior.
 RUN sed -i 's#https://huggingface.co/api/whoami#https://huggingface.co/api/whoami-v2#g' server/server.py
@@ -20,5 +21,8 @@ RUN sed -i 's/SR \* 30/SR * 15/g' server/server.py
 # Keep live PCM at 1x. Finished playback speed is generated server-side with FFmpeg atempo,
 # so iPhone Safari never changes playbackRate and cannot raise the voice pitch.
 RUN python build_patch_speed.py && rm build_patch_speed.py
+# If a higher speed is chosen during generation, pause the live 1x stream and make it clear
+# that pitch-correct playback is being prepared, then resume from the finished tempo file.
+RUN python build_patch_pending_speed.py && rm build_patch_pending_speed.py
 RUN mkdir -p /srv/data/models /srv/data/out
 CMD ["sh", "-c", "exec uvicorn server.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
