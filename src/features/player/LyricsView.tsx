@@ -328,12 +328,14 @@ export function LyricsView({ chunkText }: LyricsViewProps) {
     return () => window.cancelAnimationFrame(frame)
   }, [activeWordIndex, activeHighlightIndex, usesWordBoundaries])
 
+  // Keep the narrated page compact on phones so most Pocket chunks fit without
+  // scrolling. Longer chunks step down slightly more to preserve the full page.
   const textSizeClass =
     chunkText.length > 720
-      ? 'text-lg leading-8'
+      ? 'text-[1rem] leading-7'
       : chunkText.length > 520
-        ? 'text-xl leading-9'
-        : 'text-[1.35rem] leading-9'
+        ? 'text-[1.05rem] leading-7'
+        : 'text-[1.1rem] leading-7'
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface-1/30">
